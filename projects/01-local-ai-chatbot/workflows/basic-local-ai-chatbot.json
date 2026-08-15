@@ -1,0 +1,91 @@
+{
+  "name": "Basic AI Chatbot",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b567299c-b33c-4d0a-8d15-81ec39d42f26",
+      "name": "When chat message received",
+      "webhookId": "256d2ebd-7f52-401d-86ce-6792fc7a4061"
+    },
+    {
+      "parameters": {
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        224,
+        0
+      ],
+      "id": "94444e01-3079-4b6a-90d2-2e5ff9b3ea23",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        160,
+        208
+      ],
+      "id": "3c75df50-9217-43c5-b86a-0b74da45738e",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "uXQMChPjvWnWTcK0",
+          "name": "Ollama account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3fba6466-9a8c-4733-b98c-b40be9875bbf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1d21b3f7dad3e7c07c8ba836ffcdb4e6f5690205cc67cffe0f03198d91b13e20"
+  },
+  "nodeGroups": [],
+  "id": "R2ztnPRgFKxRSth9",
+  "tags": []
+}
