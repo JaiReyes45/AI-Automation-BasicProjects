@@ -1,0 +1,579 @@
+{
+  "name": "Expense Tracker - Phase 4 AI Classification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f4fa322b-4e70-4068-812b-012d576729df",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        -64
+      ],
+      "id": "999ef7a7-f290-47de-a3b0-9a8625aabbf4",
+      "name": "Webhook",
+      "webhookId": "f4fa322b-4e70-4068-812b-012d576729df"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3e96a9b1-2e64-45ea-ab0c-ac974cee4977",
+              "leftValue": "={{ $json.body.description }}",
+              "rightValue": "Groceries",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "e6496600-3a4e-46e3-965d-e8bda32eda43",
+              "leftValue": "={{ $json.body.amount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "ea03ecf9-9420-4039-9941-236723db56cb",
+              "leftValue": "={{ $json.body.date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        192,
+        -64
+      ],
+      "id": "011b07e1-01f1-4b9d-99de-735276eedc3d",
+      "name": "Validate Expense"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        416,
+        128
+      ],
+      "id": "9c663538-e3b9-44f0-8ef1-c0ed06652573",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "uXQMChPjvWnWTcK0",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify the following expense:\n\n{{ $json.body.description }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Classify the expense as: Food, Transportation, Utilities, Education, Entertainment, Shopping, Healthcare, or Other. Set confidence from 0 to 1. Return only the required structured output with no explanation."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        416,
+        -80
+      ],
+      "id": "3e1c6f93-29f0-44b2-b0cd-d07ac4724eb8",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"category\": \"Utilities\",\n  \"confidence\": 0.95\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        128
+      ],
+      "id": "06a64604-558f-462f-93af-b9b0a3581b35",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bdf754e6-68ec-49c0-a0ae-c112500301c0",
+              "leftValue": "={{ $json.output.confidence }}",
+              "rightValue": 0.8,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        768,
+        -80
+      ],
+      "id": "a20ca683-2242-4db6-bf0e-108396f5b891",
+      "name": "Check Confidence Score"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "94ee85a4-2d6b-4885-a2a9-696fd0f6c4da",
+              "name": "status",
+              "value": "classified",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        784,
+        -288
+      ],
+      "id": "26148d8c-8e54-4f69-b5dd-5f71513d2da2",
+      "name": "Confidence >0.8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8b6c2c05-5a54-4198-a705-c374749144e9",
+              "name": "status",
+              "value": "needs_review",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        784,
+        176
+      ],
+      "id": "e3107c85-8785-4fe1-9a61-eea5282ea442",
+      "name": "Confidence <0.8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "48d81e0e-a6fd-4747-8abe-cfb03d3b6e9b",
+              "name": "description",
+              "value": "={{ $('Webhook').item.json.body.description }}",
+              "type": "string"
+            },
+            {
+              "id": "cff38025-1da2-4147-abfc-7ba283dd8d0f",
+              "name": "amount",
+              "value": "={{ $('Webhook').item.json.body.amount }}",
+              "type": "number"
+            },
+            {
+              "id": "ac7fcb21-a169-48c7-99f7-b5deb44256dc",
+              "name": "date",
+              "value": "={{ $('Webhook').item.json.body.date }}",
+              "type": "string"
+            },
+            {
+              "id": "b418b731-3c1c-471d-a489-f34fe0b3faab",
+              "name": "category",
+              "value": "={{ $('Basic LLM Chain').item.json.output.category }}",
+              "type": "string"
+            },
+            {
+              "id": "3c873871-1367-45e7-a5fd-9820d71d7e59",
+              "name": "confidence",
+              "value": "={{ $('Basic LLM Chain').item.json.output.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "fb81d4f0-2ddb-4daf-b5b1-fe8efda33a15",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        976,
+        -288
+      ],
+      "id": "e8eab8b6-acb3-43ca-9ca9-079fe0160dc2",
+      "name": "Classified Format Final Expense1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "33757471-68d7-415e-9017-3c47df56aed9",
+              "name": "body.description",
+              "value": "={{ $('Webhook').item.json.body.description }}",
+              "type": "string"
+            },
+            {
+              "id": "b22fb90e-19f7-4396-b6e8-7aaab74e13dc",
+              "name": "body.amount",
+              "value": "={{ $('Webhook').item.json.body.amount }}",
+              "type": "number"
+            },
+            {
+              "id": "a1f9ca24-bfbc-4595-96de-173d19cc72d9",
+              "name": "body.date",
+              "value": "={{ $('Webhook').item.json.body.date }}",
+              "type": "string"
+            },
+            {
+              "id": "3e318cbe-65a2-4cfa-800b-ef2aa925f665",
+              "name": "output.category",
+              "value": "={{ $('Basic LLM Chain').item.json.output.category }}",
+              "type": "string"
+            },
+            {
+              "id": "bfeef072-d27b-445e-aa17-2f0b04f200ae",
+              "name": "output.confidence",
+              "value": "={{ $('Basic LLM Chain').item.json.output.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "03d9a69f-7fcc-44fc-b605-890f8711b3a3",
+              "name": "output.category",
+              "value": "={{ $json.output.category }}",
+              "type": "string"
+            },
+            {
+              "id": "01501fa9-055e-4b43-ab9e-bf820acc69b0",
+              "name": "output.confidence",
+              "value": "={{ $json.output.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "78867a54-12e2-425d-bbcc-929eae520ed3",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1008,
+        176
+      ],
+      "id": "7e53eebe-3aa0-4b46-9ea9-1e2f3e049bda",
+      "name": "To_Review Format Final Expense"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "expenses",
+          "mode": "list",
+          "cachedResultName": "expenses"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confidence": "={{ $json.confidence }}",
+            "amount": "={{ $json.amount }}",
+            "description": "={{ $json.description }}",
+            "expense_date": "={{ $json.date }}",
+            "category": "={{ $json.category }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "expense_date",
+              "displayName": "expense_date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1008,
+        -64
+      ],
+      "id": "521d4d79-9ce7-4d0d-b4a4-b2957f857a9e",
+      "name": "Save Expense",
+      "credentials": {
+        "postgres": {
+          "id": "jAHOq1MnhrA1HcTz",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Expense": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Check Confidence Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Confidence Score": {
+      "main": [
+        [
+          {
+            "node": "Confidence >0.8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confidence <0.8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence >0.8": {
+      "main": [
+        [
+          {
+            "node": "Classified Format Final Expense1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence <0.8": {
+      "main": [
+        [
+          {
+            "node": "To_Review Format Final Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classified Format Final Expense1": {
+      "main": [
+        [
+          {
+            "node": "Save Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ba176772-ab57-44bd-bb12-3b2e4346c357",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1d21b3f7dad3e7c07c8ba836ffcdb4e6f5690205cc67cffe0f03198d91b13e20"
+  },
+  "nodeGroups": [],
+  "id": "OcqxgpHLsry3cz4H",
+  "tags": []
+}
