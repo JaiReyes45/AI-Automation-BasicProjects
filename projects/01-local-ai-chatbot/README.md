@@ -54,12 +54,3 @@ This is my first learning project. It currently does not include:
 - Implement RAG
 - Add logging and error handling
 
-## Screenshots
-
-### Workflow
-
-![n8n Workflow](screenshots/workflow.png)
-
-### Demo
-
-![Chatbot Demo](screenshots/demo.png)
