@@ -1,0 +1,231 @@
+{
+  "name": "LTO - Excel Registration Report",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    plate_number,\n    vehicle_type,\n    mvuc,\n    legal_research_fee,\n    penalty,\n    amount_paid,\n    freelancer_fee,\n    status,\n    processed_at\nFROM registrations\nWHERE status = 'COMPLETED'\nORDER BY id ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "17428af8-fc2e-4fe3-84d5-617d8cb998cb",
+      "name": "Get Completed Registrations",
+      "credentials": {
+        "postgres": {
+          "id": "cWsaxlrPdGNEYv7r",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d841f1ac-ff52-439d-bb9d-a5d5e18713a3",
+              "name": "Plate Number",
+              "value": "={{ $json.plate_number }}",
+              "type": "string"
+            },
+            {
+              "id": "a18cceef-2663-4a41-856d-2e7b7416197b",
+              "name": "Vehicle Type",
+              "value": "={{ $json.vehicle_type }}",
+              "type": "string"
+            },
+            {
+              "id": "71a6824f-c743-42e9-8d32-b6544dabcec8",
+              "name": "MVUC",
+              "value": "={{ $json.mvuc }}",
+              "type": "number"
+            },
+            {
+              "id": "872af310-e314-4829-85be-e99670861156",
+              "name": "Legal Research Fee",
+              "value": "={{ $json.legal_research_fee }}",
+              "type": "number"
+            },
+            {
+              "id": "80f83373-fa03-430e-833e-db8dec051923",
+              "name": "Penalty",
+              "value": "={{ $json.penalty }}",
+              "type": "number"
+            },
+            {
+              "id": "7118f795-7538-434d-a346-0990b022c32a",
+              "name": "Amount Paid",
+              "value": "={{ $json.amount_paid }}",
+              "type": "number"
+            },
+            {
+              "id": "ae0ab5a2-25aa-4819-b40e-b5b2e37e7b2a",
+              "name": "Status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "97262e49-2d2a-4d11-9847-1dd0036f76c8",
+              "name": "freelancer_fee",
+              "value": "={{ $json.freelancer_fee }}",
+              "type": "string"
+            },
+            {
+              "id": "ac666af6-63a2-4e42-8a36-1d889999ae02",
+              "name": "Overall Total",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a55aac76-9a5b-4ffa-b157-28a7cd46396b",
+      "name": "Prepare Excel Rows"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "fileName": "report-1"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        16
+      ],
+      "id": "62b29c13-84b6-4f71-beec-30e7aa6d3a7a",
+      "name": "Generate Excel Report"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/freelance/reports/report-1.xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        0
+      ],
+      "id": "2f122dc6-3c79-4a7c-8e6c-e4b603069441",
+      "name": "Save Excel Report"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "835bb063-ec8d-47b8-be72-afc017c4c34c",
+      "name": "Called by ORCR Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nlet totalMvuc = 0;\nlet totalLegal = 0;\nlet totalPenalty = 0;\nlet totalAmount = 0;\nlet totalFreelancer = 0;\n\nfor (const item of rows) {\n  totalMvuc += Number(item.json[\"MVUC\"] || 0);\n  totalLegal += Number(item.json[\"Legal Research Fee\"] || 0);\n  totalPenalty += Number(item.json[\"Penalty\"] || 0);\n  totalAmount += Number(item.json[\"Amount Paid\"] || 0);\n  totalFreelancer += Number(item.json[\"Freelancer Fee\"] || 0);\n}\n\nconst overallTotal =\n  totalMvuc +\n  totalLegal +\n  totalPenalty +\n  totalAmount +\n  totalFreelancer;\n\nconst totalRow = {\n  json: {\n    \"Plate Number\": \"TOTAL\",\n    \"Vehicle Type\": \"\",\n    \"MVUC\": totalMvuc,\n    \"Legal Research Fee\": totalLegal,\n    \"Penalty\": totalPenalty,\n    \"Amount Paid\": totalAmount,\n    \"Freelancer Fee\": totalFreelancer,\n    \"Overall Total\": \"\",\n    \"Status\": \"\"\n  }\n};\n\nconst grandTotalRow = {\n  json: {\n    \"Plate Number\": \"GRAND TOTAL\",\n    \"Vehicle Type\": \"\",\n    \"MVUC\": \"\",\n    \"Legal Research Fee\": \"\",\n    \"Penalty\": \"\",\n    \"Amount Paid\": \"\",\n    \"Freelancer Fee\": \"\",\n    \"Overall Total\": overallTotal,\n    \"Status\": \"\"\n  }\n};\n\nreturn [...rows, totalRow, grandTotalRow];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "e52f3415-d2c1-4255-865b-3bb0f3898ecd",
+      "name": "Add Report Totals"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Completed Registrations": {
+      "main": [
+        [
+          {
+            "node": "Prepare Excel Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Excel Rows": {
+      "main": [
+        [
+          {
+            "node": "Add Report Totals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Excel Report": {
+      "main": [
+        [
+          {
+            "node": "Save Excel Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Excel Report": {
+      "main": [
+        []
+      ]
+    },
+    "Called by ORCR Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Completed Registrations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Report Totals": {
+      "main": [
+        [
+          {
+            "node": "Generate Excel Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "08a65eba-c9f4-4e36-837b-92b1376675d7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1d21b3f7dad3e7c07c8ba836ffcdb4e6f5690205cc67cffe0f03198d91b13e20"
+  },
+  "nodeGroups": [],
+  "id": "26Z9kkT18sU9633X",
+  "tags": []
+}

@@ -1,0 +1,1083 @@
+{
+  "name": "LTO - ORCR Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "03012474-1c6d-472c-8d52-1785f74663d4",
+              "name": "amount_paid",
+              "value": "={{ Number($json.mvuc) + Number($json.legal_research_fee) + Number($json.penalty) }}",
+              "type": "number"
+            },
+            {
+              "id": "fc19165b-4280-4ab5-a452-5e1e05f83660",
+              "name": "freelancer_fee",
+              "value": 250,
+              "type": "number"
+            },
+            {
+              "id": "48f88a47-bc0f-4840-a646-eefed66e2e79",
+              "name": "status",
+              "value": "COMPLETED",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1520,
+        256
+      ],
+      "id": "934b4728-7045-4637-bb6b-5d1b110ceb4d",
+      "name": "Calculate Regis Fees"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        32
+      ],
+      "id": "eecf0b09-9b25-4c9c-9fb7-98ef3b7b287e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "binaryData": true,
+        "dataPropertyName": "document_hash"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "128984ca-2e28-482f-8653-67b5fbcd2447",
+      "name": "Generate Document Hash"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS (\n    SELECT 1\n    FROM registrations\n    WHERE document_hash = $1\n) AS is_duplicate;",
+        "options": {
+          "queryReplacement": "={{ $json.document_hash }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        464,
+        0
+      ],
+      "id": "bee4a958-352c-4f53-9c86-3fc26bc3028a",
+      "name": "Check Duplicate",
+      "credentials": {
+        "postgres": {
+          "id": "cWsaxlrPdGNEYv7r",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0e9dbc07-38a1-4ea1-9f26-b373333cb197",
+              "leftValue": true,
+              "rightValue": "={{ $json.is_duplicate }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        0
+      ],
+      "id": "c0bdc1f7-db29-4db3-9316-dd35b0368ada",
+      "name": "Is Duplicate?"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/data/freelance/documents/inbox/*.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        0
+      ],
+      "id": "4ac2de64-3b22-439f-a306-3a7b4d03df19",
+      "name": "Read ORCR PNG"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "qwen2.5vl:7b",
+          "mode": "list",
+          "cachedResultName": "qwen2.5vl:7b"
+        },
+        "text": "You are extracting structured information from a scanned Philippine LTO vehicle registration document.\n\nAnalyze the provided image and extract ONLY the following fields:\n\n1. plate_number\n2. vehicle_type\n3. mvuc\n4. legal_research_fee\n5. penalty\n\nRules:\n\n- Read values only from the provided document.\n- Never guess or invent unreadable information.\n- If plate_number cannot be confidently read, return null.\n- If vehicle_type cannot be confidently read, return null.\n- If MVUC cannot be confidently identified, return null.\n- If Legal Research Fee cannot be confidently identified, return null.\n- If there is no penalty shown on the document, return 0.\n- Monetary values must be numbers only.\n- Do not include peso signs or commas in numeric values.\n- Do NOT calculate the total amount paid.\n- Do NOT calculate the freelancer fee.\n- Do NOT extract OR number.\n- Do NOT extract registration date.\n- Do NOT extract any other fields.\n- Do not provide explanations.\n\nReturn ONLY valid JSON using exactly this structure:\n\n{\n  \"plate_number\": null,\n  \"vehicle_type\": null,\n  \"mvuc\": null,\n  \"legal_research_fee\": null,\n  \"penalty\": 0\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        560,
+        272
+      ],
+      "id": "1363d6bc-3002-47d0-a6e4-dca4c37fafb9",
+      "name": "Analyze image",
+      "credentials": {
+        "ollamaApi": {
+          "id": "uXQMChPjvWnWTcK0",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        336,
+        272
+      ],
+      "id": "b28681da-e1c3-452b-b091-8595b19ba29d",
+      "name": "Restore ORCR Image"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\n\nconst errors = [];\n\n// Plate number\nif (\n  data.plate_number === null ||\n  data.plate_number === undefined ||\n  String(data.plate_number).trim() === ''\n) {\n  errors.push('PLATE_NUMBER_MISSING');\n}\n\n// Vehicle type\nif (\n  data.vehicle_type === null ||\n  data.vehicle_type === undefined ||\n  String(data.vehicle_type).trim() === ''\n) {\n  errors.push('VEHICLE_TYPE_MISSING');\n}\n\n// MVUC\nif (\n  data.mvuc === null ||\n  data.mvuc === undefined ||\n  !Number.isFinite(Number(data.mvuc)) ||\n  Number(data.mvuc) < 0\n) {\n  errors.push('INVALID_MVUC');\n}\n\n// Legal Research Fee\nif (\n  data.legal_research_fee === null ||\n  data.legal_research_fee === undefined ||\n  !Number.isFinite(Number(data.legal_research_fee)) ||\n  Number(data.legal_research_fee) < 0\n) {\n  errors.push('INVALID_LEGAL_RESEARCH_FEE');\n}\n\n// Penalty\nif (\n  data.penalty === null ||\n  data.penalty === undefined ||\n  !Number.isFinite(Number(data.penalty)) ||\n  Number(data.penalty) < 0\n) {\n  errors.push('INVALID_PENALTY');\n}\n\nreturn {\n  json: {\n    ...data,\n    validation_passed: errors.length === 0,\n    validation_errors: errors\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        272
+      ],
+      "id": "7d8733f6-bbb6-419b-8cca-408f772164d8",
+      "name": "Validate ORCR Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.content;\n\n// Remove Markdown code fences\nconst cleaned = content\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\n// Convert JSON string into a real JavaScript object\nconst extracted = JSON.parse(cleaned);\n\n// Return clean structured data\nreturn {\n  json: {\n    plate_number: extracted.plate_number ?? null,\n    vehicle_type: extracted.vehicle_type ?? null,\n\n    mvuc:\n      extracted.mvuc !== null &&\n      extracted.mvuc !== undefined\n        ? Number(extracted.mvuc)\n        : null,\n\n    legal_research_fee:\n      extracted.legal_research_fee !== null &&\n      extracted.legal_research_fee !== undefined\n        ? Number(extracted.legal_research_fee)\n        : null,\n\n    penalty:\n      extracted.penalty !== null &&\n      extracted.penalty !== undefined\n        ? Number(extracted.penalty)\n        : 0\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        272
+      ],
+      "id": "0e04a469-5e62-4b13-aa23-f623136cef62",
+      "name": "Parse ORCR Extraction"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f483081-7a26-469b-818d-ecfef5a2f1f8",
+              "leftValue": "={{ $json.validation_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1232,
+        272
+      ],
+      "id": "c9242d90-5533-4317-a03a-c126d2cf973f",
+      "name": "Extraction Valid?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fc9ed769-7a40-40be-ba67-8f7c2d2571aa",
+              "name": "document_hash",
+              "value": "={{ $('Generate Document Hash').item.json.document_hash }}",
+              "type": "string"
+            },
+            {
+              "id": "fad3eb0c-abee-453c-921b-881d6ae921c0",
+              "name": "source_filename",
+              "value": "={{ $('Read ORCR PNG').item.binary.data.fileName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1744,
+        256
+      ],
+      "id": "5434a8a9-6004-4cb9-8c62-631cbe4508c7",
+      "name": "Prepare Database Record"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9c1008fb-af77-4ba2-b921-05f7c0d6e6f7",
+              "name": "status",
+              "value": "=DUPLICATE",
+              "type": "string"
+            },
+            {
+              "id": "0784987f-b9ae-4210-9ffd-c3eb049651d0",
+              "name": "reason",
+              "value": "DOCUMENT_HASH_EXISTS",
+              "type": "string"
+            },
+            {
+              "id": "4021a688-4d95-47d5-a5c6-322bd2338e9a",
+              "name": "document_hash",
+              "value": "={{ $('Generate Document Hash').item.json.document_hash}}",
+              "type": "string"
+            },
+            {
+              "id": "d2f92941-aec0-40a5-9872-c35bdef73e36",
+              "name": "source_filename",
+              "value": "={{ $('Read ORCR PNG').item.binary.data.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "2cdc57dd-abd0-4a14-9f30-3181ce6040e4",
+              "name": "freelancer_fee",
+              "value": 250,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        912,
+        -32
+      ],
+      "id": "6e921f36-179f-4d8b-913b-19e24a0c1ba4",
+      "name": "Mark Duplicate"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "registrations",
+          "mode": "list",
+          "cachedResultName": "registrations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mvuc": "={{ $json.mvuc }}",
+            "legal_research_fee": "={{ $json.legal_research_fee }}",
+            "penalty": "={{ $json.penalty }}",
+            "amount_paid": "={{ $json.amount_paid }}",
+            "freelancer_fee": "={{ $json.freelancer_fee }}",
+            "document_hash": "={{ $json.document_hash }}",
+            "source_filename": "={{ $json.source_filename }}",
+            "plate_number": "={{ $json.plate_number }}",
+            "vehicle_type": "={{ $json.vehicle_type }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "document_hash",
+              "displayName": "document_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source_filename",
+              "displayName": "source_filename",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plate_number",
+              "displayName": "plate_number",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicle_type",
+              "displayName": "vehicle_type",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mvuc",
+              "displayName": "mvuc",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "legal_research_fee",
+              "displayName": "legal_research_fee",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "penalty",
+              "displayName": "penalty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "amount_paid",
+              "displayName": "amount_paid",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "freelancer_fee",
+              "displayName": "freelancer_fee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_reason",
+              "displayName": "error_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1968,
+        256
+      ],
+      "id": "d0327468-8f1d-4474-b0ec-3c69b3a1fd31",
+      "name": "Save Registration",
+      "credentials": {
+        "postgres": {
+          "id": "cWsaxlrPdGNEYv7r",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06d90c29-a715-4d97-b0fa-7679ee26304b",
+              "name": "status",
+              "value": "MANUAL_REVIEW",
+              "type": "string"
+            },
+            {
+              "id": "7ad12bf1-f56b-4951-8d0e-96f41e277b35",
+              "name": "document_hash",
+              "value": "={{ $('Generate Document Hash').item.json.document_hash}}",
+              "type": "string"
+            },
+            {
+              "id": "e78a45a2-0278-4899-a204-4031c693a03e",
+              "name": "source_filename",
+              "value": "={{ $('Read ORCR PNG').item.binary.data.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "c5fa7de4-0928-4804-af17-0d8a90a1a972",
+              "name": "review_errors",
+              "value": "={{ '{' + $json.validation_errors.map(e => '\"' + e + '\"').join(',') + '}' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1472,
+        448
+      ],
+      "id": "cee70feb-221a-4a2f-aaae-be90a6e77e95",
+      "name": "Prepare Manual Review"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1696,
+        448
+      ],
+      "id": "ce59d5b7-ee34-468c-af49-c3187c427e76",
+      "name": "Restore Review Image"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ '/data/freelance/documents/manual-review/' + $json.source_filename }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        448
+      ],
+      "id": "f850d741-79a9-4200-b7a5-2737b480d084",
+      "name": "Copy to Manual Review"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "manual_reviews",
+          "mode": "list",
+          "cachedResultName": "manual_reviews"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mvuc": "={{ $json.mvuc === null || $json.mvuc === undefined || $json.mvuc === '' ? null : Number($json.mvuc) }}",
+            "legal_research_fee": "={{ $json.legal_research_fee === null || $json.legal_research_fee === undefined || $json.legal_research_fee === '' ? null : Number($json.legal_research_fee) }}",
+            "penalty": "={{ $json.penalty === null || $json.penalty === undefined || $json.penalty === '' ? null : Number($json.penalty) }}",
+            "document_hash": "={{ $json.document_hash }}",
+            "source_filename": "={{ $json.source_filename }}",
+            "plate_number": "={{ $json.plate_number || null }}",
+            "vehicle_type": "={{ $json.vehicle_type || null }}",
+            "status": "={{ $json.status }}",
+            "validation_errors": "={{$json.validation_errors}}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "document_hash",
+              "displayName": "document_hash",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source_filename",
+              "displayName": "source_filename",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plate_number",
+              "displayName": "plate_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "vehicle_type",
+              "displayName": "vehicle_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mvuc",
+              "displayName": "mvuc",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "legal_research_fee",
+              "displayName": "legal_research_fee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "penalty",
+              "displayName": "penalty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "validation_errors",
+              "displayName": "validation_errors",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2176,
+        432
+      ],
+      "id": "b00e5426-30bd-447c-b069-07d9902ed45a",
+      "name": "Save Manual Review",
+      "credentials": {
+        "postgres": {
+          "id": "cWsaxlrPdGNEYv7r",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "26Z9kkT18sU9633X",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/26Z9kkT18sU9633X",
+          "cachedResultName": "LTO - Excel Registration Report"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2192,
+        256
+      ],
+      "id": "2ca45962-c5f8-437c-8da1-b9cea139ca8f",
+      "name": "Update Excel Report"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        0
+      ],
+      "id": "d5bd7e53-dd78-46be-be8e-e3955db38fe5",
+      "name": "Check ORCR Inbox"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2320,
+        112
+      ],
+      "id": "747d471b-4052-4d7d-bf9e-a569aded5a8a",
+      "name": "Restore Completed Image"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ '/data/freelance/documents/completed/' + $('Read ORCR PNG').item.binary.data.fileName }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        2544,
+        112
+      ],
+      "id": "17d91137-e96d-4c1c-a321-bebd5821fed6",
+      "name": "Copy to Completed"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calculate Regis Fees": {
+      "main": [
+        [
+          {
+            "node": "Prepare Database Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Generate Document Hash": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read ORCR PNG": {
+      "main": [
+        [
+          {
+            "node": "Generate Document Hash",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Restore ORCR Image",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Restore Review Image",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Restore Completed Image",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Mark Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore ORCR Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore ORCR Image": {
+      "main": [
+        [
+          {
+            "node": "Analyze image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse ORCR Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze image": {
+      "main": [
+        [
+          {
+            "node": "Parse ORCR Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ORCR Extraction": {
+      "main": [
+        [
+          {
+            "node": "Validate ORCR Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate ORCR Data": {
+      "main": [
+        [
+          {
+            "node": "Extraction Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction Valid?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Regis Fees",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Database Record": {
+      "main": [
+        [
+          {
+            "node": "Save Registration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Restore Review Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Review Image": {
+      "main": [
+        [
+          {
+            "node": "Copy to Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy to Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Save Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Registration": {
+      "main": [
+        [
+          {
+            "node": "Update Excel Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check ORCR Inbox": {
+      "main": [
+        [
+          {
+            "node": "Read ORCR PNG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Excel Report": {
+      "main": [
+        [
+          {
+            "node": "Restore Completed Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Completed Image": {
+      "main": [
+        [
+          {
+            "node": "Copy to Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "73554663-f96e-486a-afc2-880359c9d627",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1d21b3f7dad3e7c07c8ba836ffcdb4e6f5690205cc67cffe0f03198d91b13e20"
+  },
+  "nodeGroups": [],
+  "id": "VlYYa2TijTUnLB1r",
+  "tags": []
+}
