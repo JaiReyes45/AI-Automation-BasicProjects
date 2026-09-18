@@ -1,0 +1,53 @@
+{
+  "name": "Helpdesk - 01 Ticket Intake and Validation (inactive)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk/tickets",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f6c2ff03-82d3-43a0-9e1a-55a7a3f796d1",
+      "name": "Ticket Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "helpdesk-ticket-intake-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = $json.body || {};\nconst email = String(body.email || '').trim().toLowerCase();\nconst subject = String(body.subject || '').trim();\nconst description = String(body.description || '').trim();\nconst correlationId = crypto.randomUUID();\nconst validEmail = /^\\S+@\\S+\\.\\S+$/.test(email);\nconst error = !validEmail ? 'invalid_email' : !subject ? 'empty_subject' : !description ? 'empty_description' : subject.length > 200 || description.length > 10000 ? 'content_too_long' : null;\nif (error) return [{ json: { accepted: false, statusCode: 400, error, correlationId } }];\nconst providedKey = String($json.headers?.['idempotency-key'] || '');\nconst idempotencyKey = crypto.createHash('sha256').update([email, subject, description, providedKey].join('|')).digest('hex');\nreturn [{ json: { accepted: true, statusCode: 202, correlationId, idempotencyKey, ticket: { email, subject, description } } }];"
+      },
+      "id": "e51f1f07-6c02-44ef-9ece-2d881bc8d5bb",
+      "name": "Validate and Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": { "responseCode": "={{ $json.statusCode }}" }
+      },
+      "id": "4c9ffdbb-fda5-4b91-8f2c-7ff1d18c27f1",
+      "name": "Safe Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "Ticket Webhook": { "main": [[{ "node": "Validate and Normalize", "type": "main", "index": 0 }]] },
+    "Validate and Normalize": { "main": [[{ "node": "Safe Response", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [],
+  "active": false,
+  "versionId": "4e32d261-0d6f-498f-8dfd-1c1004acfb14",
+  "meta": { "templateCredsSetupCompleted": true },
+  "id": "helpdesk-ticket-intake-v1"
+}
