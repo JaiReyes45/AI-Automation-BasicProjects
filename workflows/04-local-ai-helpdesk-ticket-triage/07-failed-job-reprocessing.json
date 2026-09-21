@@ -1,0 +1,137 @@
+{
+  "id": "helpdesk-failed-job-reprocessing-v1",
+  "name": "Helpdesk - 07 Failed Job Reprocessing (inactive)",
+  "active": false,
+  "versionId": "2c83495a-9d37-414c-ae8b-ff662328cf19",
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "tags": [],
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "helpdesk/failed-jobs/reprocess", "responseMode": "responseNode", "options": {} },
+      "id": "f1e65d91-0907-4637-9e9a-0623e68ba9f1",
+      "name": "Reprocess Failed Job Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "helpdesk-failed-job-reprocessing-v1"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "c1731cb1-bb79-4c6c-b2a3-9d3dd34ef12d", "leftValue": "={{ $json.stage }}", "rightValue": "notification", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "options": {} },
+      "id": "d05eedb4-439b-46d0-8ed4-f9d34d7cd95c",
+      "name": "Is Notification Replay",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [700, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='pending',attempts=0,last_error_code=NULL WHERE idempotency_key=$1 AND ticket_id=$2::uuid AND status='failed' RETURNING outbox_id;",
+        "options": { "queryReplacement": "={{ [$json.idempotency_key,$json.ticket_id] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "95d52fad-9a72-4d43-a9bb-2c717fc60209",
+      "name": "Reset Notification for Retry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [940, -140]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst failedJobId = String(body.failedJobId || '').trim();\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuid.test(failedJobId)) throw new Error('invalid_failed_job_id');\nreturn [{json:{failedJobId}}];"
+      },
+      "id": "0518e66a-4f67-4455-bd03-83fb6c0424aa",
+      "name": "Validate Reprocess Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.failed_jobs SET attempt_count=attempt_count+1,next_retry_at=NULL,terminal=(attempt_count+1>=3) WHERE failed_job_id=$1::uuid AND terminal=false AND resolved_at IS NULL AND attempt_count<3 AND replay_context->>'version'='1' AND replay_context->>'idempotency_key' ~ '^[a-f0-9]{64}$' RETURNING failed_job_id,ticket_id,stage,idempotency_key,attempt_count,terminal;",
+        "options": { "queryReplacement": "={{ [$json.failedJobId] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "dec8f68c-eb95-4d51-9fc4-6deec9054fa6",
+      "name": "Claim Failed Job Atomically",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ticket_id,correlation_id,idempotency_key,requester_email,subject,description,created_at FROM helpdesk.tickets WHERE idempotency_key=$1 AND ticket_id=$2::uuid;",
+        "options": { "queryReplacement": "={{ [$json.idempotency_key,$json.ticket_id] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "e67ae864-6f77-4294-9ea1-0620496a933d",
+      "name": "Load Durable Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [940, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $json;\nconst job = $('Claim Failed Job Atomically').first().json;\nif (!ticket.ticket_id || !ticket.correlation_id || !ticket.idempotency_key) throw new Error('replay_ticket_not_found');\nreturn [{json:{ticket:{email:ticket.requester_email,subject:ticket.subject,description:ticket.description},correlationId:ticket.correlation_id,idempotencyKey:ticket.idempotency_key,receivedAt:ticket.created_at,failedJobId:job.failed_job_id}}];"
+      },
+      "id": "211d9c17-a880-4b33-b52b-09997da48710",
+      "name": "Build Replay Classification Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 0]
+    },
+    {
+      "parameters": { "source": "database", "workflowId": "HlpAiClassV2a001", "options": { "waitForSubWorkflow": true } },
+      "id": "3d3e01fe-0ab4-4f59-95e0-5303f7fe6cbd",
+      "name": "Replay AI Classification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1180, 0]
+    },
+    {
+      "parameters": { "source": "database", "workflowId": "helpdesk-routing-sla-v1", "options": { "waitForSubWorkflow": true } },
+      "id": "a70194a6-645d-485a-a3eb-264f1073caa1",
+      "name": "Replay Routing and SLA",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1420, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.failed_jobs SET resolved_at=now(),terminal=true WHERE failed_job_id=$1::uuid AND resolved_at IS NULL RETURNING failed_job_id;",
+        "options": { "queryReplacement": "={{ [$('Claim Failed Job Atomically').first().json.failed_job_id] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "39fb07a6-3c1d-4cf0-a4d9-78bf429dfd44",
+      "name": "Resolve Replayed Job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1660, 0]
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ $json.failed_job_id ? {status:'reprocessed',failedJobId:$json.failed_job_id} : {status:'not_found_not_replayable_or_already_claimed'} }}", "options": {} },
+      "id": "4b1c40b9-ed6f-464e-8221-36776282812f",
+      "name": "Return Safe Reprocess Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1900, 0]
+    }
+  ],
+  "connections": {
+    "Reprocess Failed Job Webhook": { "main": [[{ "node": "Validate Reprocess Request", "type": "main", "index": 0 }]] },
+    "Validate Reprocess Request": { "main": [[{ "node": "Claim Failed Job Atomically", "type": "main", "index": 0 }]] },
+    "Claim Failed Job Atomically": { "main": [[{ "node": "Is Notification Replay", "type": "main", "index": 0 }]] },
+    "Is Notification Replay": { "main": [[{ "node": "Reset Notification for Retry", "type": "main", "index": 0 }], [{ "node": "Load Durable Ticket", "type": "main", "index": 0 }]] },
+    "Reset Notification for Retry": { "main": [[{ "node": "Resolve Replayed Job", "type": "main", "index": 0 }]] },
+    "Load Durable Ticket": { "main": [[{ "node": "Build Replay Classification Input", "type": "main", "index": 0 }]] },
+    "Build Replay Classification Input": { "main": [[{ "node": "Replay AI Classification", "type": "main", "index": 0 }]] },
+    "Replay AI Classification": { "main": [[{ "node": "Replay Routing and SLA", "type": "main", "index": 0 }]] },
+    "Replay Routing and SLA": { "main": [[{ "node": "Resolve Replayed Job", "type": "main", "index": 0 }]] },
+    "Resolve Replayed Job": { "main": [[{ "node": "Return Safe Reprocess Result", "type": "main", "index": 0 }]] }
+  }
+}

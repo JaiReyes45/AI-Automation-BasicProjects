@@ -1,5 +1,16 @@
 {
+  "id": "helpdesk-ticket-intake-v1",
   "name": "Helpdesk - 01 Ticket Intake and Validation (inactive)",
+  "active": false,
+  "versionId": "68a5dd47-ec68-4e2a-ac89-85da14d26c07",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "nodes": [
     {
       "parameters": {
@@ -12,42 +23,276 @@
       "name": "Ticket Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "helpdesk-ticket-intake-v1"
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst body = $json.body || {};\nconst email = String(body.email || '').trim().toLowerCase();\nconst subject = String(body.subject || '').trim();\nconst description = String(body.description || '').trim();\nconst correlationId = crypto.randomUUID();\nconst validEmail = /^\\S+@\\S+\\.\\S+$/.test(email);\nconst error = !validEmail ? 'invalid_email' : !subject ? 'empty_subject' : !description ? 'empty_description' : subject.length > 200 || description.length > 10000 ? 'content_too_long' : null;\nif (error) return [{ json: { accepted: false, statusCode: 400, error, correlationId } }];\nconst providedKey = String($json.headers?.['idempotency-key'] || '');\nconst idempotencyKey = crypto.createHash('sha256').update([email, subject, description, providedKey].join('|')).digest('hex');\nreturn [{ json: { accepted: true, statusCode: 202, correlationId, idempotencyKey, ticket: { email, subject, description } } }];"
+        "jsCode": "const crypto = require('crypto');\nconst body = $json.body || {};\nconst email = String(body.email || '').trim().toLowerCase();\nconst subject = String(body.subject || '').trim();\nconst description = String(body.description || '').trim();\nconst correlationId = crypto.randomUUID();\nconst validEmail = /^\\S+@\\S+\\.\\S+$/.test(email);\nconst error = !validEmail ? 'invalid_email' : !subject ? 'empty_subject' : !description ? 'empty_description' : subject.length > 200 || description.length > 10000 ? 'content_too_long' : null;\nif (error) return [{ json: { accepted: false, statusCode: 400, error, correlationId } }];\nconst providedKey = String($json.headers?.['idempotency-key'] || '');\nconst idempotencyKey = crypto.createHash('sha256').update([email, subject, description, providedKey].join('|')).digest('hex');\nreturn [{ json: { accepted: true, statusCode: 202, correlationId, idempotencyKey, receivedAt: new Date().toISOString(), ticket: { email, subject, description } } }];"
       },
       "id": "e51f1f07-6c02-44ef-9ece-2d881bc8d5bb",
       "name": "Validate and Normalize",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [240, 0]
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1a558f8-1ce7-43b7-8aaf-9b8d2e0d687a",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0ea17b9c-8a3d-4db4-a0ce-88d1241d91b1",
+      "name": "Is Accepted Ticket",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}",
-        "options": { "responseCode": "={{ $json.statusCode }}" }
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
       },
       "id": "4c9ffdbb-fda5-4b91-8f2c-7ff1d18c27f1",
-      "name": "Safe Response",
+      "name": "Safe Rejection Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [480, 0]
+      "position": [
+        680,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.tickets (correlation_id,idempotency_key,requester_email,subject,description,status) VALUES ($1::uuid,$2,$3,$4,$5,'received') ON CONFLICT (idempotency_key) DO UPDATE SET updated_at=now() RETURNING ticket_id,correlation_id,(xmax=0) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [$json.correlationId,$json.idempotencyKey,$json.ticket.email,$json.ticket.subject,$json.ticket.description] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "a40d5fdc-fd92-4b26-8100-8c1a099ccad9",
+      "name": "Persist Accepted Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) VALUES ($1::uuid,'ticket_accepted','workflow:helpdesk-intake',$2::uuid,$3::jsonb) RETURNING event_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id,$json.correlation_id,JSON.stringify({idempotent_insert:$json.inserted})] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "b318d3b3-7c61-42e0-bec7-5b4bf944936f",
+      "name": "Write Intake Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake = $('Validate and Normalize').first().json;\nif (!intake.accepted) throw new Error('unexpected_unaccepted_ticket');\nreturn [{json:{ticket:intake.ticket,correlationId:intake.correlationId,idempotencyKey:intake.idempotencyKey,receivedAt:intake.receivedAt}}];"
+      },
+      "id": "b4d8c44b-0e3b-4d66-8371-2911660f42e6",
+      "name": "Build Classification Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true, statusCode: 202, correlationId: $json.correlationId, message: 'Ticket accepted for processing' } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "6ca99a97-4c63-4ea5-af67-07d49bd911ae",
+      "name": "Safe Accepted Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1400,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "HlpAiClassV2a001",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "3ef88f61-638a-44f7-9e38-105a80a90f7a",
+      "name": "Execute AI Classification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1640,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "helpdesk-routing-sla-v1",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "7de9bc68-cbfa-4da1-99cf-f331b2e45816",
+      "name": "Execute Routing and SLA",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1880,
+        -60
+      ]
     }
   ],
   "connections": {
-    "Ticket Webhook": { "main": [[{ "node": "Validate and Normalize", "type": "main", "index": 0 }]] },
-    "Validate and Normalize": { "main": [[{ "node": "Safe Response", "type": "main", "index": 0 }]] }
-  },
-  "pinData": {},
-  "settings": { "executionOrder": "v1" },
-  "staticData": null,
-  "tags": [],
-  "active": false,
-  "versionId": "4e32d261-0d6f-498f-8dfd-1c1004acfb14",
-  "meta": { "templateCredsSetupCompleted": true },
-  "id": "helpdesk-ticket-intake-v1"
+    "Ticket Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate and Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Normalize": {
+      "main": [
+        [
+          {
+            "node": "Is Accepted Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Accepted Ticket": {
+      "main": [
+        [
+          {
+            "node": "Persist Accepted Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Rejection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Accepted Ticket": {
+      "main": [
+        [
+          {
+            "node": "Write Intake Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Intake Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Build Classification Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Classification Input": {
+      "main": [
+        [
+          {
+            "node": "Safe Accepted Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safe Accepted Response": {
+      "main": [
+        [
+          {
+            "node": "Execute AI Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute AI Classification": {
+      "main": [
+        [
+          {
+            "node": "Execute Routing and SLA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

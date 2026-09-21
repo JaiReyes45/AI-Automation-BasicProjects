@@ -26,6 +26,7 @@ PostgreSQL, Ollama, and Mailpit.
 - [Failure and recovery](docs/failure-and-recovery.md)
 - [Security](docs/security.md)
 - [Testing](docs/testing.md)
+- [Evaluation report](docs/evaluation-report.md)
 - [Portfolio case study](docs/portfolio-case-study.md)
 - [Migration](migrations/001_helpdesk.sql)
 - [Synthetic fixtures](fixtures/tickets.json)

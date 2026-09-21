@@ -4,7 +4,11 @@ Run deterministic tests:
 
 ```bash
 node projects/04-local-ai-helpdesk-ticket-triage/tests/run-tests.js
+node projects/04-local-ai-helpdesk-ticket-triage/tests/workflow-contracts.js
 ```
+
+Run the database constraints test through `psql` in a transaction; it rolls
+back all synthetic rows. Keep n8n workflows inactive while running these tests.
 
 Validate Compose before starting or recreating services:
 
@@ -19,6 +23,21 @@ and dead-letter replay. The evaluation report must record total cases,
 classification agreement, invalid-output rate, review rate, duplicate result,
 average duration, recovery result, and known limitations. Do not claim metrics
 until the test execution records them.
+
+## 2026-09-21 baseline results
+
+- 22 deterministic validation, routing, retry, and SLA cases passed.
+- 23 static workflow-contract cases passed, including inactive-state, secret-like
+  field, capture/replay, and SLA-monitor checks.
+- The rollback-only PostgreSQL constraint test passed, including duplicate
+  protection, dead-letter claim-after-resolution rejection, and SLA-breach
+  idempotency.
+- One live internal Ollama injection-style synthetic ticket returned parseable
+  JSON with every required contract field and a valid confidence value.
+
+Workflows remained inactive throughout. Outage, worker-retry, and full
+workflow-reprocessing exercises require a controlled execution harness and are
+not represented by the baseline results.
 
 ## Demo script
 

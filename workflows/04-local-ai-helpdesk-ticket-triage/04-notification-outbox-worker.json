@@ -1,0 +1,191 @@
+{
+  "id": "helpdesk-notification-outbox-v1",
+  "name": "Helpdesk - 04 Notification Outbox Worker (inactive)",
+  "active": false,
+  "versionId": "2fc5f15b-3d89-4f45-8ddd-0ea2222aaf7d",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "e00203e3-19ea-43b4-9f1a-5d254e0516bd",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH claimed AS (UPDATE helpdesk.notification_outbox SET status='sending', attempts=attempts+1, last_error_code=NULL WHERE outbox_id IN (SELECT outbox_id FROM helpdesk.notification_outbox WHERE status IN ('pending','failed') AND attempts < 3 ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 10) RETURNING outbox_id,ticket_id,idempotency_key,notification_type,attempts) SELECT c.outbox_id,c.ticket_id,c.idempotency_key,c.notification_type,c.attempts,t.requester_email,t.subject,t.correlation_id FROM claimed c JOIN helpdesk.tickets t ON t.ticket_id=c.ticket_id;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "1f5d33c0-9f55-486d-80f8-1d6d673c8226",
+      "name": "Claim Pending Notifications",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "helpdesk@example.test",
+        "toEmail": "={{ $json.requester_email }}",
+        "subject": "={{ $json.notification_type === 'sla_breach' ? 'Helpdesk SLA escalation: ' + $json.subject : 'Helpdesk ticket received: ' + $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.notification_type === 'sla_breach' ? 'Your helpdesk ticket has exceeded its response target.\\n\\nReference: ' + $json.correlation_id + '\\nSubject: ' + $json.subject + '\\n\\nIt has been escalated for attention.' : 'Your helpdesk ticket has been received.\\n\\nReference: ' + $json.correlation_id + '\\nSubject: ' + $json.subject + '\\n\\nWe will update you when it is routed.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": "Mailpit SMTP (local)"
+      },
+      "id": "f07c20b4-f896-422c-be36-e2b8ec3e13a1",
+      "name": "Send Acknowledgment via Mailpit",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        500,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='sent', sent_at=now(), last_error_code=NULL WHERE outbox_id=$1::uuid AND status='sending' RETURNING outbox_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Claim Pending Notifications').item.json.outbox_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "2f9f0b16-b267-4f95-a6cf-9c5d6fb0c21d",
+      "name": "Mark Notification Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        760,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='failed', last_error_code='smtp_delivery_failed' WHERE outbox_id=$1::uuid AND status='sending' RETURNING outbox_id,ticket_id,attempts;",
+        "options": {
+          "queryReplacement": "={{ [$('Claim Pending Notifications').item.json.outbox_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "68463b76-1b64-47e6-9a66-6ca6ef49f259",
+      "name": "Mark Notification Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [760, 100]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 }, "conditions": [{ "id": "df9e5f66-b833-4447-9c51-334515efc6c4", "leftValue": "={{ $json.attempts }}", "rightValue": 3, "operator": { "type": "number", "operation": "gte" } }], "combinator": "and" }, "options": {} },
+      "id": "3c11b05b-4cc4-42aa-9d4b-2314e75eef1d",
+      "name": "Is Notification Retry Limit Reached",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1000, 100]
+    },
+    {
+      "parameters": { "jsCode": "const claimed = $('Claim Pending Notifications').item.json;\nreturn [{json:{stage:'notification',failureClass:'retryable',errorCode:'smtp_delivery_failed',ticketId:$json.ticket_id,idempotencyKey:claimed.idempotency_key,sourceWorkflow:'helpdesk-notification-outbox'}}];" },
+      "id": "b318207b-6845-43e5-94bc-c5a2fda6cd2e",
+      "name": "Build Notification Failure Capture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 40]
+    },
+    {
+      "parameters": { "source": "database", "workflowId": "helpdesk-error-capture-v1", "options": { "waitForSubWorkflow": true } },
+      "id": "c381815a-b630-4375-b62f-505f19a1384c",
+      "name": "Capture Notification Failure",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1480, 40]
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Claim Pending Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Pending Notifications": {
+      "main": [
+        [
+          {
+            "node": "Send Acknowledgment via Mailpit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Acknowledgment via Mailpit": {
+      "main": [
+        [
+          {
+            "node": "Mark Notification Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Notification Failed": {
+      "main": [[{ "node": "Is Notification Retry Limit Reached", "type": "main", "index": 0 }]]
+    },
+    "Is Notification Retry Limit Reached": {
+      "main": [
+        [{ "node": "Build Notification Failure Capture", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Notification Failure Capture": {
+      "main": [[{ "node": "Capture Notification Failure", "type": "main", "index": 0 }]]
+    }
+  }
+}

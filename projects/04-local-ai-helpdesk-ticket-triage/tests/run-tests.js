@@ -18,5 +18,11 @@ ok(() => assert.equal(r.route({...c,category:'unknown'},'unclear').assigned_queu
 ok(() => assert.deepEqual([1,2,3].map(r.retryDelaySeconds), [30,120,600]));
 ok(() => assert.throws(() => r.retryDelaySeconds(4), /invalid_attempt/));
 ok(() => assert.equal(r.slaDeadline('P1','2026-09-18T00:00:00Z').toISOString(), '2026-09-18T04:00:00.000Z'));
-ok(() => assert.equal(r.slaDeadline('P2','2026-09-18T08:00:00Z').toISOString(), '2026-09-19T08:00:00.000Z'));
+ok(() => assert.equal(r.slaDeadline('P2','2026-09-18T08:00:00Z').toISOString(), '2026-09-21T08:00:00.000Z'));
+ok(() => assert.equal(r.slaDeadline('P2','2026-09-18T09:00:00Z').toISOString(), '2026-09-21T09:00:00.000Z'));
+ok(() => assert.equal(r.slaDeadline('P2','2026-09-20T04:00:00Z').toISOString(), '2026-09-21T09:00:00.000Z'));
+ok(() => assert.equal(r.slaDeadline('P3','2026-09-18T08:00:00Z').toISOString(), '2026-09-22T08:00:00.000Z'));
+ok(() => assert.equal(r.slaDeadline('P1','2026-09-20T08:00:00Z').toISOString(), '2026-09-20T12:00:00.000Z'));
+ok(() => assert.throws(() => r.slaDeadline('P5','2026-09-18T00:00:00Z'), /invalid_priority/));
+ok(() => assert.throws(() => r.slaDeadline('P2','not-a-date'), /invalid_received_at/));
 console.log(passed + ' deterministic tests passed');

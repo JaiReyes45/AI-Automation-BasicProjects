@@ -1,0 +1,116 @@
+{
+  "id": "helpdesk-human-review-v1",
+  "name": "Helpdesk - 05 Human Review Resolution (inactive)",
+  "active": false,
+  "versionId": "5d4931a1-0e3f-41b4-9dd5-f9917cfc81d4",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk/review/resolve",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "cc7250ef-85e1-4a7a-bd72-cc9ad387377c",
+      "name": "Reviewer Resolution Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst reviewTaskId = String(body.reviewTaskId || '').trim();\nconst reviewer = String(body.reviewer || '').trim();\nconst decision = String(body.decision || '').trim();\nconst assignedQueue = String(body.assignedQueue || '').trim();\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst queues = ['security_response','technical_support','account_support','billing_support','product_feedback','general_support'];\nif (!uuid.test(reviewTaskId)) throw new Error('invalid_review_task_id');\nif (!reviewer || reviewer.length > 120) throw new Error('invalid_reviewer');\nif (!['route','reject'].includes(decision)) throw new Error('invalid_review_decision');\nif (decision === 'route' && !queues.includes(assignedQueue)) throw new Error('invalid_assigned_queue');\nreturn [{json:{reviewTaskId,reviewer,decision,assignedQueue:decision === 'route' ? assignedQueue : 'manual_review'}}];"
+      },
+      "id": "7de44d65-667a-4f6b-b6bb-335769b170b3",
+      "name": "Validate Reviewer Resolution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH resolved AS (UPDATE helpdesk.review_tasks SET status='resolved',resolution=$2,resolved_by=$3,resolved_at=now(),updated_at=now() WHERE review_task_id=$1::uuid AND status IN ('open','claimed') RETURNING ticket_id), updated_ticket AS (UPDATE helpdesk.tickets t SET status=CASE WHEN $2='route' THEN 'routed' ELSE 'failed' END,assigned_queue=CASE WHEN $2='route' THEN $4 ELSE 'manual_review' END,needs_human_review=false,updated_at=now() FROM resolved r WHERE t.ticket_id=r.ticket_id RETURNING t.ticket_id,t.correlation_id), event AS (INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) SELECT ticket_id,CASE WHEN $2='route' THEN 'human_review_routed' ELSE 'human_review_rejected' END,$3,correlation_id,jsonb_build_object('assigned_queue',$4) FROM updated_ticket) SELECT ticket_id,correlation_id FROM updated_ticket;",
+        "options": {
+          "queryReplacement": "={{ [$json.reviewTaskId,$json.decision,$json.reviewer,$json.assignedQueue] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "6ed6d056-69b2-4d3d-b457-11382501340a",
+      "name": "Resolve Review Task Atomically",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.ticket_id ? {status:'resolved',ticketId:$json.ticket_id,correlationId:$json.correlation_id} : {status:'not_found_or_already_resolved'} }}",
+        "options": {}
+      },
+      "id": "59a2611a-b4ea-47db-b5c5-e0781c9cb9b8",
+      "name": "Return Safe Review Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        760,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Reviewer Resolution Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Reviewer Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Reviewer Resolution": {
+      "main": [
+        [
+          {
+            "node": "Resolve Review Task Atomically",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Review Task Atomically": {
+      "main": [
+        [
+          {
+            "node": "Return Safe Review Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

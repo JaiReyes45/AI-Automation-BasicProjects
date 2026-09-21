@@ -56,11 +56,15 @@ function retryDelaySeconds(attempt) {
 
 function addBusinessMinutes(start, minutes) {
   let at = new Date(start);
+  if (Number.isNaN(at.getTime())) throw Error('invalid_received_at');
   let left = minutes;
   while (left > 0) {
     const day = at.getUTCDay();
     const hour = at.getUTCHours();
-    if (day === 0 || day === 6 || hour < 1 || hour >= 9) { at.setUTCDate(at.getUTCDate() + (hour >= 9 || day === 6 ? 1 : 0)); at.setUTCHours(1,0,0,0); continue; }
+    if (day === 6) { at.setUTCDate(at.getUTCDate() + 2); at.setUTCHours(1,0,0,0); continue; }
+    if (day === 0) { at.setUTCDate(at.getUTCDate() + 1); at.setUTCHours(1,0,0,0); continue; }
+    if (hour < 1) { at.setUTCHours(1,0,0,0); continue; }
+    if (hour >= 9) { at.setUTCDate(at.getUTCDate() + 1); at.setUTCHours(1,0,0,0); continue; }
     const available = (9 - hour) * 60 - at.getUTCMinutes();
     const used = Math.min(left, available);
     at = new Date(at.getTime() + used * 60000);
@@ -72,7 +76,9 @@ function addBusinessMinutes(start, minutes) {
 function slaDeadline(priority, receivedAt) {
   const minutes = { P1: 240, P2: 480, P3: 960, P4: 2400 }[priority];
   if (!minutes) throw Error('invalid_priority');
-  if (priority === 'P1') return new Date(new Date(receivedAt).getTime() + minutes * 60000);
+  const received = new Date(receivedAt);
+  if (Number.isNaN(received.getTime())) throw Error('invalid_received_at');
+  if (priority === 'P1') return new Date(received.getTime() + minutes * 60000);
   return addBusinessMinutes(receivedAt, minutes);
 }
 

@@ -1,0 +1,61 @@
+{
+  "id": "helpdesk-error-capture-v1",
+  "name": "Helpdesk - 06 Error Capture and Dead Letter (inactive)",
+  "active": false,
+  "versionId": "cd6d6c8d-97de-426e-a917-90156f29739a",
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "tags": [],
+  "meta": { "templateCredsSetupCompleted": false },
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a4ac90f9-6221-4754-bc2b-21d0df1b97dc",
+      "name": "From Failed Stage",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json || {};\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst key = /^[a-f0-9]{64}$/i;\nconst stage = ['classification','routing','notification'].includes(input.stage) ? input.stage : 'unknown';\nconst failureClass = ['retryable','non_retryable','human_review','terminal'].includes(input.failureClass) ? input.failureClass : 'terminal';\nconst errorCode = String(input.errorCode || 'workflow_stage_failed').replace(/[^a-z0-9_]/gi, '_').slice(0, 80) || 'workflow_stage_failed';\nconst ticketId = uuid.test(String(input.ticketId || '')) ? String(input.ticketId) : null;\nconst idempotencyKey = key.test(String(input.idempotencyKey || '')) ? String(input.idempotencyKey).toLowerCase() : null;\nconst sourceWorkflow = String(input.sourceWorkflow || '').replace(/[^a-z0-9:_-]/gi, '_').slice(0, 120);\nconst sourceExecutionId = String(input.sourceExecutionId || '').replace(/[^a-z0-9:_-]/gi, '_').slice(0, 120);\nconst replayable = Boolean(idempotencyKey) && ['classification','routing','notification'].includes(stage) && failureClass === 'retryable';\nconst replayContext = replayable ? {version:1,stage,idempotency_key:idempotencyKey,source_workflow:sourceWorkflow || undefined,source_execution_id:sourceExecutionId || undefined} : {version:1,stage,replayable:false};\nreturn [{json:{ticketId,stage,failureClass:replayable ? 'retryable' : 'terminal',errorCode,idempotencyKey,replayContext,nextRetryAt:replayable ? new Date(Date.now() + 30000).toISOString() : null}}];"
+      },
+      "id": "1b1fd06d-5bbc-4a7a-a3a2-392762080577",
+      "name": "Sanitize Failure for DLQ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.failed_jobs (ticket_id,stage,failure_class,error_code,attempt_count,next_retry_at,terminal,replay_context,idempotency_key) VALUES (COALESCE($1::uuid,(SELECT ticket_id FROM helpdesk.tickets WHERE idempotency_key=$8)), $2,$3,$4,0,$5::timestamptz,$6,$7::jsonb,$8) RETURNING failed_job_id,ticket_id,stage,terminal;",
+        "options": { "queryReplacement": "={{ [$json.ticketId,$json.stage,$json.failureClass,$json.errorCode,$json.nextRetryAt,$json.failureClass === 'terminal',JSON.stringify($json.replayContext),$json.idempotencyKey] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "e9d60953-9a91-43eb-9d8a-d06b01df393c",
+      "name": "Persist Failed Job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) SELECT t.ticket_id,'workflow_failed','workflow:helpdesk-error-capture',t.correlation_id,jsonb_build_object('failed_job_id',$2::uuid,'stage',$3,'terminal',$4::boolean) FROM helpdesk.tickets t WHERE t.ticket_id=$1::uuid RETURNING event_id;",
+        "options": { "queryReplacement": "={{ [$json.ticket_id,$json.failed_job_id,$json.stage,$json.terminal] }}" }
+      },
+      "credentials": { "postgres": "Helpdesk PostgreSQL (helpdesk_app)" },
+      "id": "52daedce-9879-421a-b1f0-977207b4dc87",
+      "name": "Write Failure Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [720, 0]
+    }
+  ],
+  "connections": {
+    "From Failed Stage": { "main": [[{ "node": "Sanitize Failure for DLQ", "type": "main", "index": 0 }]] },
+    "Sanitize Failure for DLQ": { "main": [[{ "node": "Persist Failed Job", "type": "main", "index": 0 }]] },
+    "Persist Failed Job": { "main": [[{ "node": "Write Failure Audit Event", "type": "main", "index": 0 }]] }
+  }
+}

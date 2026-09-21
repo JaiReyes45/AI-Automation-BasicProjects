@@ -1,0 +1,208 @@
+{
+  "id": "helpdesk-routing-sla-v1",
+  "name": "Helpdesk - 03 Routing, SLA and Persistence (inactive)",
+  "active": false,
+  "versionId": "cd951cd5-a91b-4f97-a279-62f57dd54fa4",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7a7af9df-1f1e-4a36-b359-0658d411717a",
+      "name": "From AI Classification Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst ticket = input.ticket || {};\nconst c = input.classification || {};\nconst allowedCategories = ['account','billing','technical','security','feature_request','general','unknown'];\nconst allowedQueues = ['security_response','technical_support','account_support','billing_support','product_feedback','general_support','manual_review'];\nconst allowedPriorities = ['P1','P2','P3','P4'];\nif (!ticket.email || !ticket.subject || !ticket.description || !input.correlationId || !input.idempotencyKey) throw new Error('invalid_routing_input');\nif (!allowedCategories.includes(c.category) || !allowedPriorities.includes(c.priority) || !allowedQueues.includes(c.assigned_queue) || typeof c.confidence !== 'number' || c.confidence < 0 || c.confidence > 1) throw new Error('invalid_classification_contract');\nconst text = (ticket.subject + ' ' + ticket.description).toLowerCase();\nconst security = c.category === 'security' || /account takeover|compromis|security incident|credential/.test(text) || ['account_takeover','security_incident'].includes(c.safety_or_security_concern);\nconst outage = /outage|service down|all users|production down/.test(text);\nconst review = security || outage || c.confidence < 0.80 || c.needs_human_review === true || c.category === 'unknown' || c.safety_or_security_concern !== 'none';\nlet priority = security ? 'P1' : outage ? 'P2' : c.priority;\nif ((c.category === 'account' || c.category === 'technical') && priority === 'P4') priority = 'P3';\nconst queue = security ? 'security_response' : review ? 'manual_review' : c.assigned_queue;\nconst received = new Date(input.receivedAt || Date.now());\nif (Number.isNaN(received.getTime())) throw new Error('invalid_received_at');\nconst minutes = {P1:240,P2:480,P3:960,P4:2400}[priority];\nfunction businessDeadline(at, remaining) {\n  while (remaining > 0) {\n    const day = at.getUTCDay(), hour = at.getUTCHours();\n    if (day === 6) { at.setUTCDate(at.getUTCDate()+2); at.setUTCHours(1,0,0,0); continue; }\n    if (day === 0) { at.setUTCDate(at.getUTCDate()+1); at.setUTCHours(1,0,0,0); continue; }\n    if (hour < 1) { at.setUTCHours(1,0,0,0); continue; }\n    if (hour >= 9) { at.setUTCDate(at.getUTCDate()+1); at.setUTCHours(1,0,0,0); continue; }\n    const used = Math.min(remaining, (9-hour)*60-at.getUTCMinutes());\n    at = new Date(at.getTime()+used*60000); remaining -= used;\n  }\n  return at;\n}\nconst deadline = priority === 'P1' ? new Date(received.getTime()+minutes*60000) : businessDeadline(received, minutes);\nreturn [{json:{correlationId:input.correlationId,idempotencyKey:input.idempotencyKey,ticket,classification:{...c,priority,assigned_queue:queue,needs_human_review:review},status:review?'manual_review':'routed',slaDeadline:deadline.toISOString(),modelLatencyMs:input.modelLatencyMs || null}}];"
+      },
+      "id": "236df5c4-839a-4bab-91c2-21a949c17ef4",
+      "name": "Deterministic Routing and SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.tickets (correlation_id,idempotency_key,requester_email,subject,description,status,category,priority,assigned_queue,confidence,needs_human_review,sla_deadline) VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::timestamptz) ON CONFLICT (idempotency_key) DO UPDATE SET updated_at=now() RETURNING ticket_id,correlation_id,(xmax=0) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [$json.correlationId,$json.idempotencyKey,$json.ticket.email,$json.ticket.subject,$json.ticket.description,$json.status,$json.classification.category,$json.classification.priority,$json.classification.assigned_queue,$json.classification.confidence,$json.classification.needs_human_review,$json.slaDeadline] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "3e2b24ee-3c2e-4609-9630-0efb3be00f52",
+      "name": "Persist Ticket Idempotently",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.classification_runs (ticket_id,model_name,prompt_version,result,valid,confidence,latency_ms) VALUES ($1::uuid,$2,$3,$4::jsonb,true,$5,$6);",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id,'llama3.2:3b','v1',JSON.stringify($('Deterministic Routing and SLA').first().json.classification),$('Deterministic Routing and SLA').first().json.classification.confidence,$('Deterministic Routing and SLA').first().json.modelLatencyMs] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "a0563d03-74c5-4590-a445-e7c9f23ce1b8",
+      "name": "Store Classification Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) VALUES ($1::uuid,$2,$3,$4::uuid,$5::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id,$('Deterministic Routing and SLA').first().json.status === 'manual_review' ? 'ticket_sent_to_manual_review' : 'ticket_routed','workflow:helpdesk-routing-sla',$('Persist Ticket Idempotently').first().json.correlation_id,JSON.stringify({priority:$('Deterministic Routing and SLA').first().json.classification.priority,queue:$('Deterministic Routing and SLA').first().json.classification.assigned_queue,sla_deadline:$('Deterministic Routing and SLA').first().json.slaDeadline})] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "7d0b0ab7-b0d3-43c0-ac3c-3ec4cd81e33e",
+      "name": "Write Routing Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1020,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.notification_outbox (ticket_id,idempotency_key) VALUES ($1::uuid,$2) ON CONFLICT (idempotency_key) DO NOTHING RETURNING outbox_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id, $('Deterministic Routing and SLA').first().json.idempotencyKey] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "55f81734-8d67-45f4-8b8f-4e9d542bff0f",
+      "name": "Queue Acknowledgment Notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.review_tasks (ticket_id,reason_codes) SELECT $1::uuid,$2::jsonb WHERE $3::boolean ON CONFLICT (ticket_id) DO NOTHING RETURNING review_task_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id,JSON.stringify({reason:'deterministic_review_required',priority:$('Deterministic Routing and SLA').first().json.classification.priority,confidence:$('Deterministic Routing and SLA').first().json.classification.confidence,safety_or_security_concern:$('Deterministic Routing and SLA').first().json.classification.safety_or_security_concern}),$('Deterministic Routing and SLA').first().json.classification.needs_human_review] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "ac5eea4f-eecf-4d23-bdc0-29d61820cb12",
+      "name": "Create Human Review Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "From AI Classification Workflow": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Routing and SLA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Routing and SLA": {
+      "main": [
+        [
+          {
+            "node": "Persist Ticket Idempotently",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Ticket Idempotently": {
+      "main": [
+        [
+          {
+            "node": "Store Classification Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Classification Run": {
+      "main": [
+        [
+          {
+            "node": "Write Routing Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Routing Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Queue Acknowledgment Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Acknowledgment Notification": {
+      "main": [
+        [
+          {
+            "node": "Create Human Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
