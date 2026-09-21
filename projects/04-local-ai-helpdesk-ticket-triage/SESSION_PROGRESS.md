@@ -8,8 +8,8 @@ Last updated: 2026-09-21
 - Project: projects/04-local-ai-helpdesk-ticket-triage/
 - Workflow exports: workflows/04-local-ai-helpdesk-ticket-triage/
 - Branch: main
-- Last pushed checkpoint: 57ea136
-- This handoff file is not committed yet.
+- Last pushed checkpoint: ee08e45
+- This handoff file is committed.
 
 ## Completed
 
@@ -106,7 +106,7 @@ Status key: **Completed** = implemented and verified; **In progress** = work und
 | 20 | Measured evaluation report | Completed | `docs/evaluation-report.md` records actual baseline counts, recovery evidence, unavailable metrics, and limitations without overstating results. |
 | 21 | Final workflow-export secret review | Completed | Nine workflow exports passed an inactive-state, secret-field, and non-local-URL scan; credentials remain referenced by name only. |
 | 22 | Final runtime and documentation verification | Completed | `docker compose config --quiet` passed; n8n, PostgreSQL, Ollama, and Mailpit are up; Helpdesk workflows 01–08 are inactive; tests and documentation links were verified. |
-| 23 | Commit and push | Not started | Only after explicit user approval. |
+| 23 | Commit and push | Completed | User-authorized commit `ee08e45` was pushed to `main`; it contains only Helpdesk project files and workflow exports. |
 
 ## Pause checkpoint
 
