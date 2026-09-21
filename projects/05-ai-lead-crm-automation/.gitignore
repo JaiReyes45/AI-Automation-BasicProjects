@@ -1,0 +1,10 @@
+# Secrets and local configuration
+
+.env
+.env.*
+!.env.example
+
+# Local logs and runtime data
+
+*.log
+data/
