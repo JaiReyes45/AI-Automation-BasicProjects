@@ -2,7 +2,8 @@
 
 ## Status
 
-Planning and project foundation in progress.
+In progress — planning and project foundation are complete; implementation and
+public-safe workflow evidence are the next milestones.
 
 ## Business problem
 

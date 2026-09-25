@@ -3,6 +3,12 @@
 A locally hosted AI-assisted expense processing workflow built with
 n8n, Ollama, Llama 3.2, Python, PostgreSQL, and Docker.
 
+> **Status:** Built local workflow
+>
+> **Quick review:** This project focuses on the useful automation pattern of
+> deterministic input validation, AI classification, confidence guardrails, and
+> durable PostgreSQL storage.
+
 ## Project Goal
 
 The goal of this project is to learn how deterministic workflow

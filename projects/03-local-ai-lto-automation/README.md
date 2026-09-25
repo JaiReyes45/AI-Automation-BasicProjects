@@ -3,6 +3,12 @@
 A fully local AI-powered document processing workflow for extracting
 vehicle registration information from Philippine LTO OR/CR documents.
 
+> **Status:** Prototype
+>
+> **Quick review:** Demonstrates a document-automation pipeline with duplicate
+> detection, local vision extraction, validation, persistence, reporting, and a
+> manual-review path for invalid results.
+
 ## Stack
 
 - n8n

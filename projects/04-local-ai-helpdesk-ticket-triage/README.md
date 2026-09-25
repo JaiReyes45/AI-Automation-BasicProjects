@@ -3,6 +3,12 @@
 A local-first, portfolio-quality helpdesk triage automation using n8n,
 PostgreSQL, Ollama, and Mailpit.
 
+> **Status:** Featured project — controlled demo verified
+>
+> **Quick review:** Start with the [architecture](docs/architecture.md), then
+> the [controlled-demo results](docs/controlled-demo-results.md) for recorded
+> normal intake, idempotency, and security-review evidence.
+
 ## Guarantees
 
 - AI recommends; deterministic code owns safety, routing, and SLA.

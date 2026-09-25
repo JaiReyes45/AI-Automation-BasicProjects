@@ -2,6 +2,11 @@
 
 My first AI automation workflow built using n8n, Ollama, and a locally hosted Llama model.
 
+> **Status:** Learning prototype
+>
+> **Quick review:** Read the workflow below and inspect the exported
+> [n8n workflow](workflows/basic-local-ai-chatbot.json).
+
 ## Goal
 
 The goal of this project is to learn how a basic AI chatbot workflow operates and how n8n communicates with a locally hosted LLM.
@@ -35,7 +40,7 @@ User Message
 
 The exported n8n workflow is available in:
 
-`workflows/basic-local-ai-chatbot.json`
+[`workflows/basic-local-ai-chatbot.json`](workflows/basic-local-ai-chatbot.json)
 
 ## Current Limitations
 
@@ -53,4 +58,3 @@ This is my first learning project. It currently does not include:
 - Add embeddings
 - Implement RAG
 - Add logging and error handling
-
