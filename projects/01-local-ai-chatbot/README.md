@@ -42,6 +42,15 @@ The exported n8n workflow is available in:
 
 [`workflows/basic-local-ai-chatbot.json`](workflows/basic-local-ai-chatbot.json)
 
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Architecture](docs/architecture.md)
+- [Workflow operation](docs/workflow-operation.md)
+- [Security and privacy](docs/security.md)
+- [Testing and evidence](docs/testing.md)
+- [Portfolio case study](docs/portfolio-case-study.md)
+
 ## Current Limitations
 
 This is my first learning project. It currently does not include:

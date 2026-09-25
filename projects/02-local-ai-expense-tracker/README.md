@@ -126,3 +126,13 @@ Added persistent storage using a dedicated PostgreSQL database.
   "amount": 9000,
   "date": "2026-08-16"
 }
+```
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Architecture](docs/architecture.md)
+- [Workflow operation](docs/workflow-operation.md)
+- [Security and privacy](docs/security.md)
+- [Testing and evidence](docs/testing.md)
+- [Portfolio case study](docs/portfolio-case-study.md)
