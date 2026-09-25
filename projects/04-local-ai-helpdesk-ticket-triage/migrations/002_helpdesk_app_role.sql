@@ -14,7 +14,8 @@ GRANT USAGE ON SCHEMA helpdesk TO helpdesk_app;
 
 GRANT SELECT ON helpdesk.routing_queues, helpdesk.sla_policies TO helpdesk_app;
 GRANT SELECT, INSERT, UPDATE ON helpdesk.tickets TO helpdesk_app;
-GRANT INSERT ON helpdesk.ticket_events TO helpdesk_app;
+-- INSERT ... RETURNING event_id in the workflows also requires SELECT.
+GRANT SELECT, INSERT ON helpdesk.ticket_events TO helpdesk_app;
 GRANT SELECT, INSERT, UPDATE ON helpdesk.classification_runs TO helpdesk_app;
 GRANT SELECT, INSERT, UPDATE ON helpdesk.notification_outbox TO helpdesk_app;
 GRANT SELECT, INSERT, UPDATE ON helpdesk.failed_jobs TO helpdesk_app;

@@ -16,7 +16,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "helpdesk/review/resolve",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "cc7250ef-85e1-4a7a-bd72-cc9ad387377c",

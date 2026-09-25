@@ -44,6 +44,15 @@ Last updated: 2026-09-21
 - Mailpit: localhost port 8025 and healthy
 - Do not run `docker compose down -v` or delete volumes.
 
+## 2026-09-25 disposable controlled-demo results
+
+- Verified normal synthetic intake through Mailpit acknowledgement, duplicate
+  protection (one ticket and one outbox row), P1/security review creation, and
+  review resolution to `security_response`.
+- Recorded runtime compatibility fixes in `docs/controlled-demo-results.md`.
+- Next controlled test: notification failure and bounded replay. It is not yet
+  executed and requires intentionally stopping Mailpit in a disposable stack.
+
 ## Workflow status
 
 - Workflow 01 accepts POST `/helpdesk/tickets`, validates input, creates correlation/idempotency IDs, persists valid receipts and intake audit events, returns safe 400/202 responses, then invokes workflow 02 and workflow 03. It remains inactive.
@@ -107,6 +116,7 @@ Status key: **Completed** = implemented and verified; **In progress** = work und
 | 21 | Final workflow-export secret review | Completed | Nine workflow exports passed an inactive-state, secret-field, and non-local-URL scan; credentials remain referenced by name only. |
 | 22 | Final runtime and documentation verification | Completed | `docker compose config --quiet` passed; n8n, PostgreSQL, Ollama, and Mailpit are up; Helpdesk workflows 01–08 are inactive; tests and documentation links were verified. |
 | 23 | Commit and push | Completed | User-authorized commit `ee08e45` was pushed to `main`; it contains only Helpdesk project files and workflow exports. |
+| 24 | Consolidate workflows 01–08 | In progress | Re-layout only: reorganizing inactive workflow 09 into eight annotated canvas sections; node behavior, settings, credentials, expressions, and connections must remain identical. |
 
 ## Pause checkpoint
 

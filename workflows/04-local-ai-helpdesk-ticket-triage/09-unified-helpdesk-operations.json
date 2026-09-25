@@ -1,0 +1,1427 @@
+{
+  "id": "helpdesk-unified-v1",
+  "name": "Helpdesk - Unified Operations 01-08 (inactive)",
+  "active": false,
+  "versionId": "bb4727e7-8e33-4b0e-87d7-467c37845047",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk/tickets",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f6c2ff03-82d3-43a0-9e1a-55a7a3f796d1",
+      "name": "Ticket Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        80,
+        230
+      ],
+      "webhookId": "helpdesk-ticket-intake-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = $json.body || {};\nconst email = String(body.email || '').trim().toLowerCase();\nconst subject = String(body.subject || '').trim();\nconst description = String(body.description || '').trim();\nconst correlationId = crypto.randomUUID();\nconst validEmail = /^\\S+@\\S+\\.\\S+$/.test(email);\nconst error = !validEmail ? 'invalid_email' : !subject ? 'empty_subject' : !description ? 'empty_description' : subject.length > 200 || description.length > 10000 ? 'content_too_long' : null;\nif (error) return [{ json: { accepted: false, statusCode: 400, error, correlationId } }];\nconst providedKey = String($json.headers?.['idempotency-key'] || '');\nconst idempotencyKey = crypto.createHash('sha256').update([email, subject, description, providedKey].join('|')).digest('hex');\nreturn [{ json: { accepted: true, statusCode: 202, correlationId, idempotencyKey, receivedAt: new Date().toISOString(), ticket: { email, subject, description } } }];"
+      },
+      "id": "e51f1f07-6c02-44ef-9ece-2d881bc8d5bb",
+      "name": "Validate and Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        330,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1a558f8-1ce7-43b7-8aaf-9b8d2e0d687a",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0ea17b9c-8a3d-4db4-a0ce-88d1241d91b1",
+      "name": "Is Accepted Ticket",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        580,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "4c9ffdbb-fda5-4b91-8f2c-7ff1d18c27f1",
+      "name": "Safe Rejection Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        830,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.tickets (correlation_id,idempotency_key,requester_email,subject,description,status) VALUES ($1::uuid,$2,$3,$4,$5,'received') ON CONFLICT (idempotency_key) DO UPDATE SET updated_at=now() RETURNING ticket_id,correlation_id,(xmax=0) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [$json.correlationId,$json.idempotencyKey,$json.ticket.email,$json.ticket.subject,$json.ticket.description] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "a40d5fdc-fd92-4b26-8100-8c1a099ccad9",
+      "name": "Persist Accepted Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1080,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) VALUES ($1::uuid,'ticket_accepted','workflow:helpdesk-intake',$2::uuid,$3::jsonb) RETURNING event_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id,$json.correlation_id,JSON.stringify({idempotent_insert:$json.inserted})] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "b318d3b3-7c61-42e0-bec7-5b4bf944936f",
+      "name": "Write Intake Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1330,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const intake = $('Validate and Normalize').first().json;\nif (!intake.accepted) throw new Error('unexpected_unaccepted_ticket');\nreturn [{json:{ticket:intake.ticket,correlationId:intake.correlationId,idempotencyKey:intake.idempotencyKey,receivedAt:intake.receivedAt}}];"
+      },
+      "id": "b4d8c44b-0e3b-4d66-8371-2911660f42e6",
+      "name": "Build Classification Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { accepted: true, statusCode: 202, correlationId: $json.correlationId, message: 'Ticket accepted for processing' } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "6ca99a97-4c63-4ea5-af67-07d49bd911ae",
+      "name": "Safe Accepted Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1830,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst ticket = input.ticket || input;\nif (!ticket.email || !ticket.subject || !ticket.description || !input.correlationId || !input.idempotencyKey) throw new Error('invalid_classification_input');\nconst format = {type:'object',properties:{category:{type:'string',enum:['account','billing','technical','security','feature_request','general','unknown']},priority:{type:'string',enum:['P1','P2','P3','P4']},summary:{type:'string',minLength:1,maxLength:280},sentiment:{type:'string',enum:['positive','neutral','negative','angry','abusive','unknown']},assigned_queue:{type:'string',enum:['security_response','technical_support','account_support','billing_support','product_feedback','general_support','manual_review']},confidence:{type:'number',minimum:0,maximum:1},needs_human_review:{type:'boolean'},reason:{type:'string',minLength:1,maxLength:500},safety_or_security_concern:{type:'string',enum:['none','pii_or_secret','account_takeover','security_incident','self_harm_or_threat','unknown']}},required:['category','priority','summary','sentiment','assigned_queue','confidence','needs_human_review','reason','safety_or_security_concern'],additionalProperties:false};\nconst prompt = `Return JSON matching the supplied schema. Subject: ${ticket.subject}; Description: ${ticket.description}`;\nreturn [{json:{ticket,correlationId:input.correlationId,idempotencyKey:input.idempotencyKey,receivedAt:input.receivedAt || new Date().toISOString(),ollamaRequest:{model:'llama3.2:3b',prompt,stream:false,format,options:{temperature:0}}}}];"
+      },
+      "id": "c2c5d7e9-b03f-4650-b6f3-78d50fb80f37",
+      "name": "Build Fixed Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2430,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.ollamaRequest) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "b196ded5-7adb-4c2c-af19-9a15dd2c9608",
+      "name": "Ollama JSON Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        230
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('Build Fixed Prompt').first().json;\nlet output;\ntry { output = JSON.parse($json.response); } catch { throw new Error('invalid_model_json'); }\nconst categories = ['account','billing','technical','security','feature_request','general','unknown'];\nconst priorities = ['P1','P2','P3','P4'];\nconst queues = ['security_response','technical_support','account_support','billing_support','product_feedback','general_support','manual_review'];\nconst sentiments = ['positive','neutral','negative','angry','abusive','unknown'];\nconst concerns = ['none','pii_or_secret','account_takeover','security_incident','self_harm_or_threat','unknown'];\nfor (const key of ['category','priority','summary','sentiment','assigned_queue','confidence','needs_human_review','reason','safety_or_security_concern']) if (!(key in output)) throw new Error('missing_model_field_' + key);\nif (!categories.includes(output.category) || !priorities.includes(output.priority) || !queues.includes(output.assigned_queue) || !sentiments.includes(output.sentiment) || !concerns.includes(output.safety_or_security_concern)) throw new Error('invalid_model_enum');\nif (typeof output.confidence !== 'number' || !Number.isFinite(output.confidence) || output.confidence < 0 || output.confidence > 1) throw new Error('invalid_model_confidence');\nif (typeof output.needs_human_review !== 'boolean') throw new Error('invalid_model_review_flag');\nif (!String(output.summary).trim() || String(output.summary).length > 280 || !String(output.reason).trim() || String(output.reason).length > 500) throw new Error('invalid_model_text');\nreturn [{json:{ticket:context.ticket,correlationId:context.correlationId,idempotencyKey:context.idempotencyKey,receivedAt:context.receivedAt,classification:output,modelLatencyMs:$json.total_duration ? Math.round($json.total_duration / 1000000) : null}}];"
+      },
+      "id": "f5fa0aa9-2e01-47ae-999e-a33e29d1ea43",
+      "name": "Validate Classification Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2930,
+        230
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('Build Fixed Prompt').first().json;\nconst message = String($json.error?.message || $json.message || 'classification_failed');\nconst known = ['invalid_model_json','invalid_model_enum','invalid_model_confidence','invalid_model_review_flag','invalid_model_text'];\nconst errorCode = known.find(code => message.includes(code)) || (message.includes('missing_model_field_') ? 'missing_model_field' : 'ollama_or_classification_failed');\nconst humanReview = errorCode !== 'ollama_or_classification_failed';\nreturn [{json:{stage:'classification',failureClass:humanReview ? 'human_review' : 'retryable',errorCode,idempotencyKey:context.idempotencyKey,sourceWorkflow:'helpdesk-ai-classification'}}];"
+      },
+      "id": "333252dd-4d1d-43f3-b7b5-013a01dc0f7e",
+      "name": "Build Classification Failure Capture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3180,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst ticket = input.ticket || {};\nconst c = input.classification || {};\nconst allowedCategories = ['account','billing','technical','security','feature_request','general','unknown'];\nconst allowedQueues = ['security_response','technical_support','account_support','billing_support','product_feedback','general_support','manual_review'];\nconst allowedPriorities = ['P1','P2','P3','P4'];\nif (!ticket.email || !ticket.subject || !ticket.description || !input.correlationId || !input.idempotencyKey) throw new Error('invalid_routing_input');\nif (!allowedCategories.includes(c.category) || !allowedPriorities.includes(c.priority) || !allowedQueues.includes(c.assigned_queue) || typeof c.confidence !== 'number' || c.confidence < 0 || c.confidence > 1) throw new Error('invalid_classification_contract');\nconst text = (ticket.subject + ' ' + ticket.description).toLowerCase();\nconst security = c.category === 'security' || /account takeover|compromis|security incident|credential/.test(text) || ['account_takeover','security_incident'].includes(c.safety_or_security_concern);\nconst outage = /outage|service down|all users|production down/.test(text);\nconst review = security || outage || c.confidence < 0.80 || c.needs_human_review === true || c.category === 'unknown' || c.safety_or_security_concern !== 'none';\nlet priority = security ? 'P1' : outage ? 'P2' : c.priority;\nif ((c.category === 'account' || c.category === 'technical') && priority === 'P4') priority = 'P3';\nconst queue = security ? 'security_response' : review ? 'manual_review' : c.assigned_queue;\nconst received = new Date(input.receivedAt || Date.now());\nif (Number.isNaN(received.getTime())) throw new Error('invalid_received_at');\nconst minutes = {P1:240,P2:480,P3:960,P4:2400}[priority];\nfunction businessDeadline(at, remaining) {\n  while (remaining > 0) {\n    const day = at.getUTCDay(), hour = at.getUTCHours();\n    if (day === 6) { at.setUTCDate(at.getUTCDate()+2); at.setUTCHours(1,0,0,0); continue; }\n    if (day === 0) { at.setUTCDate(at.getUTCDate()+1); at.setUTCHours(1,0,0,0); continue; }\n    if (hour < 1) { at.setUTCHours(1,0,0,0); continue; }\n    if (hour >= 9) { at.setUTCDate(at.getUTCDate()+1); at.setUTCHours(1,0,0,0); continue; }\n    const used = Math.min(remaining, (9-hour)*60-at.getUTCMinutes());\n    at = new Date(at.getTime()+used*60000); remaining -= used;\n  }\n  return at;\n}\nconst deadline = priority === 'P1' ? new Date(received.getTime()+minutes*60000) : businessDeadline(received, minutes);\nreturn [{json:{correlationId:input.correlationId,idempotencyKey:input.idempotencyKey,ticket,classification:{...c,priority,assigned_queue:queue,needs_human_review:review},status:review?'manual_review':'routed',slaDeadline:deadline.toISOString(),modelLatencyMs:input.modelLatencyMs || null}}];"
+      },
+      "id": "236df5c4-839a-4bab-91c2-21a949c17ef4",
+      "name": "Deterministic Routing and SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3730,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.tickets (correlation_id,idempotency_key,requester_email,subject,description,status,category,priority,assigned_queue,confidence,needs_human_review,sla_deadline) VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::timestamptz) ON CONFLICT (idempotency_key) DO UPDATE SET updated_at=now() RETURNING ticket_id,correlation_id,(xmax=0) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [$json.correlationId,$json.idempotencyKey,$json.ticket.email,$json.ticket.subject,$json.ticket.description,$json.status,$json.classification.category,$json.classification.priority,$json.classification.assigned_queue,$json.classification.confidence,$json.classification.needs_human_review,$json.slaDeadline] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "3e2b24ee-3c2e-4609-9630-0efb3be00f52",
+      "name": "Persist Ticket Idempotently",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3980,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.classification_runs (ticket_id,model_name,prompt_version,result,valid,confidence,latency_ms) VALUES ($1::uuid,$2,$3,$4::jsonb,true,$5,$6);",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id,'llama3.2:3b','v1',JSON.stringify($('Deterministic Routing and SLA').first().json.classification),$('Deterministic Routing and SLA').first().json.classification.confidence,$('Deterministic Routing and SLA').first().json.modelLatencyMs] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "a0563d03-74c5-4590-a445-e7c9f23ce1b8",
+      "name": "Store Classification Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4230,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) VALUES ($1::uuid,$2,$3,$4::uuid,$5::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id,$('Deterministic Routing and SLA').first().json.status === 'manual_review' ? 'ticket_sent_to_manual_review' : 'ticket_routed','workflow:helpdesk-routing-sla',$('Persist Ticket Idempotently').first().json.correlation_id,JSON.stringify({priority:$('Deterministic Routing and SLA').first().json.classification.priority,queue:$('Deterministic Routing and SLA').first().json.classification.assigned_queue,sla_deadline:$('Deterministic Routing and SLA').first().json.slaDeadline})] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "7d0b0ab7-b0d3-43c0-ac3c-3ec4cd81e33e",
+      "name": "Write Routing Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4480,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.notification_outbox (ticket_id,idempotency_key) VALUES ($1::uuid,$2) ON CONFLICT (idempotency_key) DO NOTHING RETURNING outbox_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id, $('Deterministic Routing and SLA').first().json.idempotencyKey] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "55f81734-8d67-45f4-8b8f-4e9d542bff0f",
+      "name": "Queue Acknowledgment Notification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4730,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.review_tasks (ticket_id,reason_codes) SELECT $1::uuid,$2::jsonb WHERE $3::boolean ON CONFLICT (ticket_id) DO NOTHING RETURNING review_task_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Persist Ticket Idempotently').first().json.ticket_id,JSON.stringify({reason:'deterministic_review_required',priority:$('Deterministic Routing and SLA').first().json.classification.priority,confidence:$('Deterministic Routing and SLA').first().json.classification.confidence,safety_or_security_concern:$('Deterministic Routing and SLA').first().json.classification.safety_or_security_concern}),$('Deterministic Routing and SLA').first().json.classification.needs_human_review] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "ac5eea4f-eecf-4d23-bdc0-29d61820cb12",
+      "name": "Create Human Review Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4980,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "e00203e3-19ea-43b4-9f1a-5d254e0516bd",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        5730,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH claimed AS (UPDATE helpdesk.notification_outbox SET status='sending', attempts=attempts+1, last_error_code=NULL WHERE outbox_id IN (SELECT outbox_id FROM helpdesk.notification_outbox WHERE status IN ('pending','failed') AND attempts < 3 ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 10) RETURNING outbox_id,ticket_id,idempotency_key,notification_type,attempts) SELECT c.outbox_id,c.ticket_id,c.idempotency_key,c.notification_type,c.attempts,t.requester_email,t.subject,t.correlation_id FROM claimed c JOIN helpdesk.tickets t ON t.ticket_id=c.ticket_id;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "1f5d33c0-9f55-486d-80f8-1d6d673c8226",
+      "name": "Claim Pending Notifications",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5980,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "helpdesk@example.test",
+        "toEmail": "={{ $json.requester_email }}",
+        "subject": "={{ $json.notification_type === 'sla_breach' ? 'Helpdesk SLA escalation: ' + $json.subject : 'Helpdesk ticket received: ' + $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.notification_type === 'sla_breach' ? 'Your helpdesk ticket has exceeded its response target.\\n\\nReference: ' + $json.correlation_id + '\\nSubject: ' + $json.subject + '\\n\\nIt has been escalated for attention.' : 'Your helpdesk ticket has been received.\\n\\nReference: ' + $json.correlation_id + '\\nSubject: ' + $json.subject + '\\n\\nWe will update you when it is routed.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": "Mailpit SMTP (local)"
+      },
+      "id": "f07c20b4-f896-422c-be36-e2b8ec3e13a1",
+      "name": "Send Acknowledgment via Mailpit",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        6230,
+        230
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='sent', sent_at=now(), last_error_code=NULL WHERE outbox_id=$1::uuid AND status='sending' RETURNING outbox_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Claim Pending Notifications').item.json.outbox_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "2f9f0b16-b267-4f95-a6cf-9c5d6fb0c21d",
+      "name": "Mark Notification Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        6480,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='failed', last_error_code='smtp_delivery_failed' WHERE outbox_id=$1::uuid AND status='sending' RETURNING outbox_id,ticket_id,attempts;",
+        "options": {
+          "queryReplacement": "={{ [$('Claim Pending Notifications').item.json.outbox_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "68463b76-1b64-47e6-9a66-6ca6ef49f259",
+      "name": "Mark Notification Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5730,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "df9e5f66-b833-4447-9c51-334515efc6c4",
+              "leftValue": "={{ $json.attempts }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3c11b05b-4cc4-42aa-9d4b-2314e75eef1d",
+      "name": "Is Notification Retry Limit Reached",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5980,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claimed = $('Claim Pending Notifications').item.json;\nreturn [{json:{stage:'notification',failureClass:'retryable',errorCode:'smtp_delivery_failed',ticketId:$json.ticket_id,idempotencyKey:claimed.idempotency_key,sourceWorkflow:'helpdesk-notification-outbox'}}];"
+      },
+      "id": "b318207b-6845-43e5-94bc-c5a2fda6cd2e",
+      "name": "Build Notification Failure Capture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6230,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk/review/resolve",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cc7250ef-85e1-4a7a-bd72-cc9ad387377c",
+      "name": "Reviewer Resolution Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        7980,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst reviewTaskId = String(body.reviewTaskId || '').trim();\nconst reviewer = String(body.reviewer || '').trim();\nconst decision = String(body.decision || '').trim();\nconst assignedQueue = String(body.assignedQueue || '').trim();\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst queues = ['security_response','technical_support','account_support','billing_support','product_feedback','general_support'];\nif (!uuid.test(reviewTaskId)) throw new Error('invalid_review_task_id');\nif (!reviewer || reviewer.length > 120) throw new Error('invalid_reviewer');\nif (!['route','reject'].includes(decision)) throw new Error('invalid_review_decision');\nif (decision === 'route' && !queues.includes(assignedQueue)) throw new Error('invalid_assigned_queue');\nreturn [{json:{reviewTaskId,reviewer,decision,assignedQueue:decision === 'route' ? assignedQueue : 'manual_review'}}];"
+      },
+      "id": "7de44d65-667a-4f6b-b6bb-335769b170b3",
+      "name": "Validate Reviewer Resolution",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8230,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH resolved AS (UPDATE helpdesk.review_tasks SET status='resolved',resolution=$2,resolved_by=$3,resolved_at=now(),updated_at=now() WHERE review_task_id=$1::uuid AND status IN ('open','claimed') RETURNING ticket_id), updated_ticket AS (UPDATE helpdesk.tickets t SET status=CASE WHEN $2='route' THEN 'routed' ELSE 'failed' END,assigned_queue=CASE WHEN $2='route' THEN $4 ELSE 'manual_review' END,needs_human_review=false,updated_at=now() FROM resolved r WHERE t.ticket_id=r.ticket_id RETURNING t.ticket_id,t.correlation_id), event AS (INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) SELECT ticket_id,CASE WHEN $2='route' THEN 'human_review_routed' ELSE 'human_review_rejected' END,$3,correlation_id,jsonb_build_object('assigned_queue',$4) FROM updated_ticket) SELECT ticket_id,correlation_id FROM updated_ticket;",
+        "options": {
+          "queryReplacement": "={{ [$json.reviewTaskId,$json.decision,$json.reviewer,$json.assignedQueue] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "6ed6d056-69b2-4d3d-b457-11382501340a",
+      "name": "Resolve Review Task Atomically",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        8480,
+        230
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.ticket_id ? {status:'resolved',ticketId:$json.ticket_id,correlationId:$json.correlation_id} : {status:'not_found_or_already_resolved'} }}",
+        "options": {}
+      },
+      "id": "59a2611a-b4ea-47db-b5c5-e0781c9cb9b8",
+      "name": "Return Safe Review Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        8730,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json || {};\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst key = /^[a-f0-9]{64}$/i;\nconst stage = ['classification','routing','notification'].includes(input.stage) ? input.stage : 'unknown';\nconst failureClass = ['retryable','non_retryable','human_review','terminal'].includes(input.failureClass) ? input.failureClass : 'terminal';\nconst errorCode = String(input.errorCode || 'workflow_stage_failed').replace(/[^a-z0-9_]/gi, '_').slice(0, 80) || 'workflow_stage_failed';\nconst ticketId = uuid.test(String(input.ticketId || '')) ? String(input.ticketId) : null;\nconst idempotencyKey = key.test(String(input.idempotencyKey || '')) ? String(input.idempotencyKey).toLowerCase() : null;\nconst sourceWorkflow = String(input.sourceWorkflow || '').replace(/[^a-z0-9:_-]/gi, '_').slice(0, 120);\nconst sourceExecutionId = String(input.sourceExecutionId || '').replace(/[^a-z0-9:_-]/gi, '_').slice(0, 120);\nconst replayable = Boolean(idempotencyKey) && ['classification','routing','notification'].includes(stage) && failureClass === 'retryable';\nconst replayContext = replayable ? {version:1,stage,idempotency_key:idempotencyKey,source_workflow:sourceWorkflow || undefined,source_execution_id:sourceExecutionId || undefined} : {version:1,stage,replayable:false};\nreturn [{json:{ticketId,stage,failureClass:replayable ? 'retryable' : 'terminal',errorCode,idempotencyKey,replayContext,nextRetryAt:replayable ? new Date(Date.now() + 30000).toISOString() : null}}];"
+      },
+      "id": "1b1fd06d-5bbc-4a7a-a3a2-392762080577",
+      "name": "Sanitize Failure for DLQ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2430,
+        990
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.failed_jobs (ticket_id,stage,failure_class,error_code,attempt_count,next_retry_at,terminal,replay_context,idempotency_key) VALUES (COALESCE($1::uuid,(SELECT ticket_id FROM helpdesk.tickets WHERE idempotency_key=$8)), $2,$3,$4,0,$5::timestamptz,$6,$7::jsonb,$8) RETURNING failed_job_id,ticket_id,stage,terminal;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticketId,$json.stage,$json.failureClass,$json.errorCode,$json.nextRetryAt,$json.failureClass === 'terminal',JSON.stringify($json.replayContext),$json.idempotencyKey] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "e9d60953-9a91-43eb-9d8a-d06b01df393c",
+      "name": "Persist Failed Job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2680,
+        990
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) SELECT t.ticket_id,'workflow_failed','workflow:helpdesk-error-capture',t.correlation_id,jsonb_build_object('failed_job_id',$2::uuid,'stage',$3,'terminal',$4::boolean) FROM helpdesk.tickets t WHERE t.ticket_id=$1::uuid RETURNING event_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.ticket_id,$json.failed_job_id,$json.stage,$json.terminal] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "52daedce-9879-421a-b1f0-977207b4dc87",
+      "name": "Write Failure Audit Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2930,
+        990
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk/failed-jobs/reprocess",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f1e65d91-0907-4637-9e9a-0623e68ba9f1",
+      "name": "Reprocess Failed Job Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        4280,
+        1750
+      ],
+      "webhookId": "helpdesk-failed-job-reprocessing-v1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1731cb1-bb79-4c6c-b2a3-9d3dd34ef12d",
+              "leftValue": "={{ $json.stage }}",
+              "rightValue": "notification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d05eedb4-439b-46d0-8ed4-f9d34d7cd95c",
+      "name": "Is Notification Replay",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4530,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.notification_outbox SET status='pending',attempts=0,last_error_code=NULL WHERE idempotency_key=$1 AND ticket_id=$2::uuid AND status='failed' RETURNING outbox_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotency_key,$json.ticket_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "95d52fad-9a72-4d43-a9bb-2c717fc60209",
+      "name": "Reset Notification for Retry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4780,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst failedJobId = String(body.failedJobId || '').trim();\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuid.test(failedJobId)) throw new Error('invalid_failed_job_id');\nreturn [{json:{failedJobId}}];"
+      },
+      "id": "0518e66a-4f67-4455-bd03-83fb6c0424aa",
+      "name": "Validate Reprocess Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5030,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.failed_jobs SET attempt_count=attempt_count+1,next_retry_at=NULL,terminal=(attempt_count+1>=3) WHERE failed_job_id=$1::uuid AND terminal=false AND resolved_at IS NULL AND attempt_count<3 AND replay_context->>'version'='1' AND replay_context->>'idempotency_key' ~ '^[a-f0-9]{64}$' RETURNING failed_job_id,ticket_id,stage,idempotency_key,attempt_count,terminal;",
+        "options": {
+          "queryReplacement": "={{ [$json.failedJobId] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "dec8f68c-eb95-4d51-9fc4-6deec9054fa6",
+      "name": "Claim Failed Job Atomically",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5280,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ticket_id,correlation_id,idempotency_key,requester_email,subject,description,created_at FROM helpdesk.tickets WHERE idempotency_key=$1 AND ticket_id=$2::uuid;",
+        "options": {
+          "queryReplacement": "={{ [$json.idempotency_key,$json.ticket_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "e67ae864-6f77-4294-9ea1-0620496a933d",
+      "name": "Load Durable Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5530,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = $json;\nconst job = $('Claim Failed Job Atomically').first().json;\nif (!ticket.ticket_id || !ticket.correlation_id || !ticket.idempotency_key) throw new Error('replay_ticket_not_found');\nreturn [{json:{ticket:{email:ticket.requester_email,subject:ticket.subject,description:ticket.description},correlationId:ticket.correlation_id,idempotencyKey:ticket.idempotency_key,receivedAt:ticket.created_at,failedJobId:job.failed_job_id}}];"
+      },
+      "id": "211d9c17-a880-4b33-b52b-09997da48710",
+      "name": "Build Replay Classification Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5780,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "HlpAiClassV2a001",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "3d3e01fe-0ab4-4f59-95e0-5303f7fe6cbd",
+      "name": "Replay AI Classification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        6030,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "helpdesk-routing-sla-v1",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "a70194a6-645d-485a-a3eb-264f1073caa1",
+      "name": "Replay Routing and SLA",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        6280,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE helpdesk.failed_jobs SET resolved_at=now(),terminal=true WHERE failed_job_id=$1::uuid AND resolved_at IS NULL RETURNING failed_job_id;",
+        "options": {
+          "queryReplacement": "={{ [$('Claim Failed Job Atomically').first().json.failed_job_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "39fb07a6-3c1d-4cf0-a4d9-78bf429dfd44",
+      "name": "Resolve Replayed Job",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        6530,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.failed_job_id ? {status:'reprocessed',failedJobId:$json.failed_job_id} : {status:'not_found_not_replayable_or_already_claimed'} }}",
+        "options": {}
+      },
+      "id": "4b1c40b9-ed6f-464e-8221-36776282812f",
+      "name": "Return Safe Reprocess Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        6780,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "4753385f-6208-445b-8961-02215c600841",
+      "name": "Every Five Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        7380,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH detected AS (INSERT INTO helpdesk.sla_breaches (ticket_id) SELECT t.ticket_id FROM helpdesk.tickets t WHERE t.status IN ('received','processing','routed','manual_review') AND t.sla_deadline IS NOT NULL AND t.sla_deadline < now() ON CONFLICT (ticket_id) DO NOTHING RETURNING ticket_id), events AS (INSERT INTO helpdesk.ticket_events (ticket_id,event_type,actor,correlation_id,metadata) SELECT t.ticket_id,'sla_breached','workflow:helpdesk-sla-monitor',t.correlation_id,jsonb_build_object('sla_deadline',t.sla_deadline) FROM detected d JOIN helpdesk.tickets t ON t.ticket_id=d.ticket_id), outbox AS (INSERT INTO helpdesk.notification_outbox (ticket_id,idempotency_key,notification_type) SELECT d.ticket_id,encode(digest('sla_breach:' || d.ticket_id::text,'sha256'),'hex'),'sla_breach' FROM detected d ON CONFLICT (idempotency_key) DO NOTHING RETURNING outbox_id,ticket_id) SELECT outbox_id,ticket_id FROM outbox;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": "Helpdesk PostgreSQL (helpdesk_app)"
+      },
+      "id": "cd018e31-2e36-4ee0-b9d4-393d681a64c7",
+      "name": "Record and Queue New SLA Breaches",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        7630,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 01 — Intake and validation\\n\\nPOST intake: validates, persists the durable receipt, and starts classification/routing.",
+        "height": 520,
+        "width": 2160,
+        "color": 2
+      },
+      "id": "unified-note-01",
+      "name": "Note — 01 — Intake and validation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 02 — AI classification\\n\\nBuilds a fixed prompt, calls internal Ollama, and validates the model contract.",
+        "height": 520,
+        "width": 1160,
+        "color": 4
+      },
+      "id": "unified-note-02",
+      "name": "Note — 02 — AI classification",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2350,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 03 — Routing, SLA, and persistence\\n\\nApplies deterministic safety/routing/SLA rules and persists ticket, audit, review, and outbox data.",
+        "height": 520,
+        "width": 1660,
+        "color": 5
+      },
+      "id": "unified-note-03",
+      "name": "Note — 03 — Routing, SLA, and persistence",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3650,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 04 — Notification worker\\n\\nScheduled worker: claims outbox rows, sends Mailpit messages, retries, and captures exhausted failures.",
+        "height": 520,
+        "width": 1120,
+        "color": 6
+      },
+      "id": "unified-note-04",
+      "name": "Note — 04 — Notification worker",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5650,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 05 — Human review\\n\\nReviewer webhook: validates a decision, resolves the task, updates the ticket, and audits it.",
+        "height": 520,
+        "width": 1160,
+        "color": 3
+      },
+      "id": "unified-note-05",
+      "name": "Note — 05 — Human review",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        7900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 06 — Error capture / dead letter\\n\\nSanitizes a failed stage and stores bounded replay context plus a ticket audit event.",
+        "height": 520,
+        "width": 910,
+        "color": 1
+      },
+      "id": "unified-note-06",
+      "name": "Note — 06 — Error capture / dead letter",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2350,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 07 — Failed-job reprocessing\\n\\nReviewer-triggered replay: atomically claims a job and restarts classification/routing or resets a notification.",
+        "height": 520,
+        "width": 2910,
+        "color": 7
+      },
+      "id": "unified-note-07",
+      "name": "Note — 07 — Failed-job reprocessing",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4200,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 08 — SLA breach monitor\\n\\nScheduled monitor: detects each elapsed SLA once, audits it, and queues one escalation notification.",
+        "height": 520,
+        "width": 900,
+        "color": 0
+      },
+      "id": "unified-note-08",
+      "name": "Note — 08 — SLA breach monitor",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        7300,
+        1520
+      ]
+    }
+  ],
+  "connections": {
+    "Ticket Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate and Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Normalize": {
+      "main": [
+        [
+          {
+            "node": "Is Accepted Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Accepted Ticket": {
+      "main": [
+        [
+          {
+            "node": "Persist Accepted Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Rejection Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Accepted Ticket": {
+      "main": [
+        [
+          {
+            "node": "Write Intake Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Intake Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Build Classification Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Classification Input": {
+      "main": [
+        [
+          {
+            "node": "Build Fixed Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safe Accepted Response": {
+      "main": [
+        []
+      ]
+    },
+    "Build Fixed Prompt": {
+      "main": [
+        [
+          {
+            "node": "Ollama JSON Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama JSON Classification": {
+      "main": [
+        [
+          {
+            "node": "Validate Classification Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Classification Failure Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Classification Contract": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Routing and SLA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Classification Failure Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Classification Failure Capture": {
+      "main": [
+        [
+          {
+            "node": "Sanitize Failure for DLQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Routing and SLA": {
+      "main": [
+        [
+          {
+            "node": "Persist Ticket Idempotently",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Ticket Idempotently": {
+      "main": [
+        [
+          {
+            "node": "Store Classification Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Classification Run": {
+      "main": [
+        [
+          {
+            "node": "Write Routing Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Routing Audit Event": {
+      "main": [
+        [
+          {
+            "node": "Queue Acknowledgment Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Acknowledgment Notification": {
+      "main": [
+        [
+          {
+            "node": "Create Human Review Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Claim Pending Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Pending Notifications": {
+      "main": [
+        [
+          {
+            "node": "Send Acknowledgment via Mailpit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Acknowledgment via Mailpit": {
+      "main": [
+        [
+          {
+            "node": "Mark Notification Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Notification Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Notification Failed": {
+      "main": [
+        [
+          {
+            "node": "Is Notification Retry Limit Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Notification Retry Limit Reached": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Failure Capture",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Notification Failure Capture": {
+      "main": [
+        [
+          {
+            "node": "Sanitize Failure for DLQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reviewer Resolution Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Reviewer Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Reviewer Resolution": {
+      "main": [
+        [
+          {
+            "node": "Resolve Review Task Atomically",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Review Task Atomically": {
+      "main": [
+        [
+          {
+            "node": "Return Safe Review Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize Failure for DLQ": {
+      "main": [
+        [
+          {
+            "node": "Persist Failed Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Failed Job": {
+      "main": [
+        [
+          {
+            "node": "Write Failure Audit Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reprocess Failed Job Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Reprocess Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Reprocess Request": {
+      "main": [
+        [
+          {
+            "node": "Claim Failed Job Atomically",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Failed Job Atomically": {
+      "main": [
+        [
+          {
+            "node": "Is Notification Replay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Notification Replay": {
+      "main": [
+        [
+          {
+            "node": "Reset Notification for Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load Durable Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Notification for Retry": {
+      "main": [
+        [
+          {
+            "node": "Resolve Replayed Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Durable Ticket": {
+      "main": [
+        [
+          {
+            "node": "Build Replay Classification Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Replay Classification Input": {
+      "main": [
+        [
+          {
+            "node": "Replay AI Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay AI Classification": {
+      "main": [
+        [
+          {
+            "node": "Replay Routing and SLA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay Routing and SLA": {
+      "main": [
+        [
+          {
+            "node": "Resolve Replayed Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Replayed Job": {
+      "main": [
+        [
+          {
+            "node": "Return Safe Reprocess Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Five Minutes": {
+      "main": [
+        [
+          {
+            "node": "Record and Queue New SLA Breaches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
