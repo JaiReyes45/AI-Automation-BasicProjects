@@ -67,7 +67,9 @@ data, or n8n credential exports.
 - Run applicable checks before proposing changes.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the project checklist and
-[SECURITY.md](SECURITY.md) for responsible disclosure guidance.
+[SECURITY.md](SECURITY.md) for responsible disclosure guidance. See
+[Workflow Tools setup](docs/workflow-tools.md) for local linting, testing,
+mocking, and workflow-rendering commands.
 
 ## License
 

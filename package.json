@@ -1,0 +1,25 @@
+{
+  "name": "ai-automation-basic-projects",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local development tools for validating and presenting n8n workflow exports.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "workflow:lint": "workflow-lint lint projects",
+    "workflow:lint:fix": "workflow-lint lint projects --fix",
+    "workflow:format": "workflow-lint fmt projects",
+    "workflow:test": "workflow-tester run",
+    "workflow:mock": "integration-mock start",
+    "workflow:mock:log": "integration-mock log",
+    "workflow:mock:stop": "integration-mock stop",
+    "workflow:render": "workflow-render"
+  },
+  "devDependencies": {
+    "integration-mock": "^0.1.1",
+    "workflow-lint": "^0.1.1",
+    "workflow-render": "^0.2.0",
+    "workflow-tester": "^0.2.0"
+  }
+}

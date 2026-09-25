@@ -1,0 +1,32 @@
+# A hand-written test. workflow-tester runs these exactly like generated cases,
+# as far as the expression-pure part of the workflow reaches.
+#
+# `workflow-tester schema` prints the JSON Schema for this file — point an LLM at it and
+# it can write more without guessing.
+#
+# Everything below is commented out on purpose. It names a workflow you have
+# not written yet, and a scaffold that fails its own first run only teaches you
+# to ignore red lines. Point `workflow:` at a real file, uncomment, and run.
+#
+# workflow: ../../workflows/your-workflow.json
+#
+# cases:
+#   - id: happy-path
+#     title: the payload the workflow was written for
+#     when:
+#       # A node name, or a kind: webhook, form, chat.
+#       trigger: webhook
+#       # Just the body: workflow-tester wraps it in the envelope a Webhook node
+#       # delivers, so `$json.body.…` resolves the way your expressions are
+#       # written.
+#       payload:
+#         record:
+#           name: Ada
+#     then:
+#       # Expectations are flat, dotted keys. Set, IF, Code, Respond to Webhook
+#       # and the other nodes the engine interprets are checked here; anything
+#       # past an HTTP call or a credentialed node reports "needs a real
+#       # execution" rather than passing or failing.
+#       execution.status: success
+#       node.Extract.items: 1
+#       node.Extract.output[0].json.name: Ada

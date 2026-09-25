@@ -9,3 +9,9 @@ backups/
 Thumbs.db
 .idea/
 .vscode/
+
+# JavaScript development dependencies
+node_modules/
+
+# Local workflow-tester output
+.workflow-tester/reports/
