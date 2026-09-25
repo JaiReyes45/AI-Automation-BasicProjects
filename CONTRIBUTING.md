@@ -21,10 +21,10 @@ clearly state:
 4. Setup or review instructions.
 5. Validation evidence, known limitations, and next steps.
 
-Keep project-specific migrations, fixtures, diagrams, screenshots, and source
-files with that project. Workflow exports must be safe to publish and contain
-no credentials. Put shared-Compose workflow exports in the matching directory
-under `workflows/`.
+Keep project-specific migrations, fixtures, diagrams, screenshots, source
+files, and workflow exports with that project. Workflow exports must be safe to
+publish and contain no credentials. The shared Compose environment mounts the
+repository's `projects/` directory read-only at `/projects` for imports.
 
 ## Before opening a pull request
 

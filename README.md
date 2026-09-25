@@ -35,15 +35,14 @@ workflow export, and documented controlled-demo results.
 ## Repository layout
 
 ```text
-projects/     Individual project documentation, code, fixtures, and migrations
-workflows/    n8n exports mounted into the shared Docker environment
+projects/     Individual project documentation, code, fixtures, migrations, and workflow exports
 backups/      Local-only operational backups (ignored by Git)
 compose.yaml  Shared local development stack
 ```
 
-Older projects keep their workflow export alongside the project so they remain
-self-contained. Projects that use the shared Compose import path place their
-exports under the root [`workflows/`](workflows/README.md) directory.
+Every project keeps its workflow export alongside its documentation so it
+remains self-contained. The shared Compose stack mounts `projects/` read-only
+inside n8n at `/projects` for explicit import operations.
 
 ## Run locally
 

@@ -5,7 +5,7 @@ Use the n8n CLI as this project's default workflow-management interface.
 ## Rules
 
 - Run commands from the repository root.
-- Keep sanitized workflow JSON in `workflows/04-local-ai-helpdesk-ticket-triage/`.
+- Keep sanitized workflow JSON in `projects/04-local-ai-helpdesk-ticket-triage/workflows/`.
 - Do not export credentials or store passwords in workflow JSON, Git, or shell history.
 - Imported workflows must remain inactive. Do not use `--activeState=fromJson`.
 - Do not publish a workflow unless the user explicitly approves it.
@@ -21,11 +21,11 @@ docker compose exec -T n8n n8n list:workflow --active=true
 
 ## Import a workflow inactive
 
-The repository `workflows/` directory is mounted at `/workflows` in the n8n container.
+The repository `projects/` directory is mounted read-only at `/projects` in the n8n container.
 
 ```bash
 docker compose exec -T n8n n8n import:workflow \
-  --input=/workflows/04-local-ai-helpdesk-ticket-triage/07-failed-job-reprocessing.json
+  --input=/projects/04-local-ai-helpdesk-ticket-triage/workflows/07-failed-job-reprocessing.json
 ```
 
 The default import behavior deactivates the workflow. Verify with:

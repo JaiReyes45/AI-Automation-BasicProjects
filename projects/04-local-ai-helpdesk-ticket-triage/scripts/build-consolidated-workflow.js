@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const root = path.join(__dirname, '../../..');
-const dir = path.join(root, 'workflows/04-local-ai-helpdesk-ticket-triage');
+const dir = path.join(__dirname, '..', 'workflows');
 const specs = [
   ['01-ticket-intake-validation.json', '01 — Intake and validation', 'POST intake: validates, persists the durable receipt, and starts classification/routing.'],
   ['02-ai-classification-v2.json', '02 — AI classification', 'Builds a fixed prompt, calls internal Ollama, and validates the model contract.'],

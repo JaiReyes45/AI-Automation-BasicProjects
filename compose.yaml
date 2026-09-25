@@ -36,7 +36,7 @@ services:
       TZ: Asia/Manila
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./workflows:/workflows
+      - ./projects:/projects:ro
 
   ollama:
     image: ollama/ollama:latest

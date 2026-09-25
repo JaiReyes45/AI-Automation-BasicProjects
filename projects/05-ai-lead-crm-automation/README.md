@@ -36,4 +36,4 @@ Build an n8n workflow that receives a synthetic lead through a webhook, validate
 - `database/` — SQL migrations and database documentation
 - `diagrams/` — architecture and workflow diagrams
 - `screenshots/` — public-safe evidence of completed milestones
-- `workflows/` — exported n8n workflow JSON, stored separately at the repository root
+- `workflows/` — exported n8n workflow JSON for this project

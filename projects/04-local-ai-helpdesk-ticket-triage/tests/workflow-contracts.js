@@ -2,8 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const root = path.join(__dirname, '../../..');
-const dir = path.join(root, 'workflows/04-local-ai-helpdesk-ticket-triage');
+const dir = path.join(__dirname, '..', 'workflows');
 const files = ['01-ticket-intake-validation.json','02-ai-classification-v2.json','03-routing-sla-persistence.json','04-notification-outbox-worker.json','05-human-review-resolution.json','06-error-capture-dead-letter.json','07-failed-job-reprocessing.json','08-sla-breach-monitor.json'];
 let passed = 0;
 const ok = fn => { fn(); passed++; };

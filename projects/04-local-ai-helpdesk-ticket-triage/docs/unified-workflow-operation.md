@@ -30,7 +30,7 @@ Never place credential values in workflow JSON or shell commands.
 
 ~~~bash
 docker compose exec -T n8n n8n import:workflow \
-  --input=/workflows/04-local-ai-helpdesk-ticket-triage/09-unified-helpdesk-operations.json
+  --input=/projects/04-local-ai-helpdesk-ticket-triage/workflows/09-unified-helpdesk-operations.json
 ~~~
 
 2. Also keep workflows 02 and 03 imported but inactive. The failed-job replay

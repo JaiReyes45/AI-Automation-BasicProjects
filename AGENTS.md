@@ -21,8 +21,8 @@
 
 ## n8n workflows
 
-- Put reviewed workflow exports in `workflows/` as JSON files.
-- The directory is mounted at `/workflows` in the n8n container for explicit import and export operations.
+- Put reviewed workflow exports in the owning project's `workflows/` directory as JSON files.
+- The repository `projects/` directory is mounted read-only at `/projects` in the n8n container for explicit import operations.
 - Do not treat the mounted directory as an automatic backup of workflows stored in n8n's database.
 - Prefer explicit import/export commands, and confirm the target file before overwriting an existing export.
 - Preserve the `N8N_ENCRYPTION_KEY` used for an environment. Losing or changing it can make stored credentials unreadable.

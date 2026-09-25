@@ -6,7 +6,7 @@ Last updated: 2026-09-21
 
 - Repository: AI-Automation-BasicProjects
 - Project: projects/04-local-ai-helpdesk-ticket-triage/
-- Workflow exports: workflows/04-local-ai-helpdesk-ticket-triage/
+- Workflow exports: projects/04-local-ai-helpdesk-ticket-triage/workflows/
 - Branch: main
 - Last pushed checkpoint: ee08e45
 - This handoff file is committed.
