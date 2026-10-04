@@ -1,0 +1,92 @@
+[
+  {
+    "id": "p05ReplayV1",
+    "name": "05 - Dead Letter Replay",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "6df54c59-7a6e-50a3-8399-ce938b94f518",
+        "name": "When clicking Execute workflow"
+      },
+      {
+        "parameters": {
+          "mode": "raw",
+          "jsonOutput": "{\"outbox_job_id\":\"61000000-0000-4000-8000-000000000001\"}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          240,
+          0
+        ],
+        "id": "48451814-cef6-50ce-9cd6-26aa2fe20387",
+        "name": "Dead Letter Job Input"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH updated AS (\n    UPDATE lead_crm.outbox_jobs\n    SET status = 'PENDING', attempt_count = 0, available_at = NOW(),\n        locked_at = NULL, last_error = NULL, updated_at = NOW()\n    WHERE id = $1::uuid AND status = 'DEAD_LETTER'\n    RETURNING *\n), audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id, submission_id, event_type, actor_type, event_data\n    )\n    SELECT lead.correlation_id, lead.id, 'OUTBOX_JOB_REPLAYED', 'HUMAN',\n           jsonb_build_object('job_id', updated.id, 'job_type', updated.job_type)\n    FROM updated JOIN lead_crm.lead_submissions lead ON lead.id = updated.submission_id\n    RETURNING id\n)\nSELECT 'REPLAY_QUEUED' AS outcome, updated.*, audit.id AS audit_event_id\nFROM updated LEFT JOIN audit ON true;",
+          "options": {
+            "queryReplacement": "={{ [ $json.outbox_job_id ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          480,
+          0
+        ],
+        "id": "be5f6658-8b78-566f-8673-b42505c76724",
+        "name": "Replay Dead Letter Job"
+      }
+    ],
+    "connections": {
+      "When clicking Execute workflow": {
+        "main": [
+          [
+            {
+              "node": "Dead Letter Job Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Dead Letter Job Input": {
+        "main": [
+          [
+            {
+              "node": "Replay Dead Letter Job",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": {},
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

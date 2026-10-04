@@ -1,0 +1,13 @@
+{
+  "submission_id": "91000000-0000-4000-8000-000000000002",
+  "submitted_at": "2026-09-30T05:10:00Z",
+  "first_name": "Jordan",
+  "last_name": "Synthetic",
+  "email": "jordan@outside-market.example.test",
+  "company_name": "Outside Market Synthetic Ltd",
+  "job_title": "Manager",
+  "country_code": "US",
+  "message": "We are exploring general automation for a future project.",
+  "consent": true,
+  "source": "test_client"
+}

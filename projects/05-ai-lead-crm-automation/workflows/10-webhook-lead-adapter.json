@@ -1,0 +1,161 @@
+[
+  {
+    "id": "5xMADgxrUq7E0suF",
+    "name": "10 - Webhook Lead Adapter",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "lead-crm/v1/leads",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "30de919d-032f-468e-abe8-59057f973892",
+        "name": "Receive Website Lead",
+        "webhookId": "7fb96856-75ed-4a07-8049-2ce3cb37b976"
+      },
+      {
+        "parameters": {
+          "jsCode": "return $input.all().map((item) => {\n  const body = item.json.body;\n\n  const validObject =\n    body &&\n    typeof body === 'object' &&\n    !Array.isArray(body);\n\n  return {\n    json: validObject ? body : {},\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          0
+        ],
+        "id": "da0bed2f-a5c6-4802-818f-419feb22bf9e",
+        "name": "Extract Lead Body"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "bbXRGYkgxNhEwshx",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/bbXRGYkgxNhEwshx",
+            "cachedResultName": "00 - AI Lead -to-CRM Orchestrator"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          448,
+          0
+        ],
+        "id": "f06c97c0-0f5e-4992-822c-bd2b2d45da47",
+        "name": "Run Lead-to-CRM Orchestrator"
+      },
+      {
+        "parameters": {
+          "jsCode": "return $input.all().map((item) => {\n  const result = item.json;\n  let statusCode;\n\n  switch (result.outcome) {\n    case 'CREATED':\n      statusCode = result.should_continue === true ? 202 : 422;\n      break;\n\n    case 'IDEMPOTENT_REPEAT':\n      if (result.processing_status === 'INVALID') {\n        statusCode = 422;\n      } else if (result.processing_status === 'REVIEW_REQUIRED') {\n        statusCode = 409;\n      } else {\n        statusCode = 200;\n      }\n      break;\n\n    case 'INVALID':\n    case 'INVALID_SUBMISSION_ID':\n      statusCode = 422;\n      break;\n\n    case 'SUBMISSION_ID_CONFLICT':\n      statusCode = 409;\n      break;\n\n    default:\n      statusCode = 500;\n  }\n\n  const correlationId =\n    result.correlation_id ??\n    result.attempted_correlation_id ??\n    null;\n\n  return {\n    json: {\n      status_code: statusCode,\n      response: {\n        success: statusCode === 200 || statusCode === 202,\n        outcome: result.outcome ?? 'UNKNOWN',\n        submission_id: result.submission_id ?? null,\n        submission_record_id:\n          result.submission_record_id ?? null,\n        correlation_id: correlationId,\n        processing_status:\n          result.processing_status ?? null,\n        record_created:\n          result.record_created ?? false,\n        should_continue:\n          result.should_continue ?? false,\n        validation_errors:\n          result.validation_errors ?? [],\n        audit_event_id:\n          result.audit_event_id ?? null,\n      },\n    },\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          672,
+          0
+        ],
+        "id": "78d75d2d-921f-4f20-ad73-b193881c2a5c",
+        "name": "Build HTTP Response"
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json.response }}",
+          "options": {
+            "responseCode": "={{ $json.status_code }}"
+          }
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          896,
+          0
+        ],
+        "id": "281b2684-262c-4283-b0f7-5fc3804b845b",
+        "name": "Return Lead Intake Result"
+      }
+    ],
+    "connections": {
+      "Receive Website Lead": {
+        "main": [
+          [
+            {
+              "node": "Extract Lead Body",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Lead Body": {
+        "main": [
+          [
+            {
+              "node": "Run Lead-to-CRM Orchestrator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Lead-to-CRM Orchestrator": {
+        "main": [
+          [
+            {
+              "node": "Build HTTP Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build HTTP Response": {
+        "main": [
+          [
+            {
+              "node": "Return Lead Intake Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

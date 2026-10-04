@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/lead-crm/ai-extraction-v1.schema.json",
+  "title": "Lead CRM AI Extraction V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "service_category",
+    "purchase_timeline",
+    "decision_maker_status",
+    "location_country_code",
+    "need_summary",
+    "confidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "service_category": {
+      "type": "string",
+      "enum": [
+        "crm_lead_automation",
+        "invoice_approval_automation",
+        "customer_service_automation",
+        "reporting_data_integration",
+        "general_automation",
+        "unrelated",
+        "unknown"
+      ]
+    },
+    "purchase_timeline": {
+      "type": "string",
+      "enum": [
+        "within_30_days",
+        "days_31_90",
+        "over_90_days",
+        "not_stated"
+      ]
+    },
+    "decision_maker_status": {
+      "type": "string",
+      "enum": [
+        "decision_maker",
+        "champion",
+        "unclear"
+      ]
+    },
+    "location_country_code": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "need_summary": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 300
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

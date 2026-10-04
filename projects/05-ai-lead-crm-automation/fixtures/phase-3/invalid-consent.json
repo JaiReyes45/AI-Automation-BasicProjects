@@ -1,0 +1,11 @@
+{
+  "submission_id": "748cf9f4-acde-4c83-924e-11a4313a5118",
+  "submitted_at": "2026-09-30T01:35:00Z",
+  "first_name": "Maya",
+  "last_name": "Santos",
+  "email": "maya.santos@example-business.test",
+  "company_name": "Northstar Retail Systems",
+  "message": "This synthetic request verifies that processing stops when consent has not been granted.",
+  "consent": false,
+  "source": "test_client"
+}

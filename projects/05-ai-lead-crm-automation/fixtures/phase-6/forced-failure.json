@@ -1,0 +1,5 @@
+{
+  "synthetic": true,
+  "simulate_failure_until": 99,
+  "purpose": "Force a notification job into DEAD_LETTER for replay testing"
+}

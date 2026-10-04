@@ -1,0 +1,18 @@
+{
+  "submission_id": "b518ad78-6973-4f50-b566-4cbd872d26c5",
+  "submitted_at": "2026-09-30T01:30:00Z",
+  "first_name": "Maya",
+  "last_name": "Santos",
+  "email": "maya.santos@example-business.test",
+  "phone": "+63 917 000 0000",
+  "company_name": "Northstar Retail Systems",
+  "job_title": "Operations Director",
+  "company_size": 48,
+  "website": "https://northstar-retail.example.com",
+  "country_code": "PH",
+  "budget_currency": "PHP",
+  "budget_amount": 150000,
+  "message": "This changed synthetic message deliberately reuses the same submission ID to test conflict handling.",
+  "consent": true,
+  "source": "test_client"
+}

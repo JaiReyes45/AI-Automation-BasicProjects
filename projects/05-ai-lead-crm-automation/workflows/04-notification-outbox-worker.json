@@ -1,0 +1,218 @@
+[
+  {
+    "id": "p05OutboxWorkerV1",
+    "name": "04 - Notification Outbox Worker",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          -100
+        ],
+        "id": "73d66b58-7266-58c8-b175-0f676e14fdcf",
+        "name": "Run Worker Manually"
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 5
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          100
+        ],
+        "id": "5f586e25-ed93-5c44-8acf-28be6866ca9f",
+        "name": "Every Five Minutes"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH candidate AS (\n    SELECT id\n    FROM lead_crm.outbox_jobs\n    WHERE status IN ('PENDING', 'RETRY') AND available_at <= NOW()\n    ORDER BY available_at, created_at\n    FOR UPDATE SKIP LOCKED\n    LIMIT 1\n), claimed AS (\n    UPDATE lead_crm.outbox_jobs AS job\n    SET status = 'PROCESSING', attempt_count = attempt_count + 1,\n        locked_at = NOW(), updated_at = NOW()\n    FROM candidate\n    WHERE job.id = candidate.id\n    RETURNING job.*\n)\nSELECT * FROM claimed;",
+          "options": {
+            "queryReplacement": "={{ [] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          240,
+          0
+        ],
+        "id": "a0656351-a3e6-5419-a96f-6eb9e5077db5",
+        "name": "Claim One Due Job"
+      },
+      {
+        "parameters": {
+          "jsCode": "const job = $json;\nconst payload = typeof job.payload === 'string' ? JSON.parse(job.payload) : (job.payload || {});\nconst failUntil = Number(payload.simulate_failure_until || 0);\nconst delivery_succeeded = Number(job.attempt_count) > failUntil;\nreturn [{ json: {\n  ...job,\n  payload,\n  delivery_succeeded,\n  delivery_reference: delivery_succeeded ? `synthetic-${job.id}-${job.attempt_count}` : null,\n  delivery_error: delivery_succeeded ? null : 'Synthetic transient delivery failure',\n} }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          0
+        ],
+        "id": "a5015af2-4c89-5ba4-a653-bd25e76d129d",
+        "name": "Perform Synthetic Delivery"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "b61102ca-d250-5d1d-9d75-72eefc073573",
+                "leftValue": "={{ $json.delivery_succeeded }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          720,
+          0
+        ],
+        "id": "c6b0819d-158b-5958-9912-01335b3011cf",
+        "name": "Delivery Succeeded?"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH updated AS (\n    UPDATE lead_crm.outbox_jobs\n    SET status = 'SENT', sent_at = NOW(), locked_at = NULL,\n        last_error = NULL, external_reference = $2, updated_at = NOW()\n    WHERE id = $1::uuid AND status = 'PROCESSING'\n    RETURNING *\n), audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id, submission_id, event_type, actor_type, event_data\n    )\n    SELECT lead.correlation_id, lead.id, 'OUTBOX_JOB_SENT', 'WORKFLOW',\n           jsonb_build_object('job_id', updated.id, 'job_type', updated.job_type,\n                              'attempt_count', updated.attempt_count,\n                              'external_reference', updated.external_reference)\n    FROM updated JOIN lead_crm.lead_submissions lead ON lead.id = updated.submission_id\n    RETURNING id\n)\nSELECT 'SENT' AS outcome, updated.*, audit.id AS audit_event_id\nFROM updated LEFT JOIN audit ON true;",
+          "options": {
+            "queryReplacement": "={{ [ $json.id, $json.delivery_reference ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          960,
+          -96
+        ],
+        "id": "2670e8ca-d066-53b2-ac46-e17c27ec1c63",
+        "name": "Mark Job Sent"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH updated AS (\n    UPDATE lead_crm.outbox_jobs\n    SET status = CASE WHEN attempt_count >= max_attempts THEN 'DEAD_LETTER' ELSE 'RETRY' END,\n        available_at = CASE WHEN attempt_count >= max_attempts THEN available_at\n                            ELSE NOW() + make_interval(secs => LEAST(3600, (power(2, attempt_count)::integer * 60))) END,\n        locked_at = NULL, last_error = $2, updated_at = NOW()\n    WHERE id = $1::uuid AND status = 'PROCESSING'\n    RETURNING *\n), audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id, submission_id, event_type, actor_type, event_data\n    )\n    SELECT lead.correlation_id, lead.id,\n           CASE WHEN updated.status = 'DEAD_LETTER' THEN 'OUTBOX_JOB_DEAD_LETTERED' ELSE 'OUTBOX_JOB_RETRY_SCHEDULED' END,\n           'WORKFLOW',\n           jsonb_build_object('job_id', updated.id, 'job_type', updated.job_type,\n                              'attempt_count', updated.attempt_count, 'error', updated.last_error,\n                              'available_at', updated.available_at)\n    FROM updated JOIN lead_crm.lead_submissions lead ON lead.id = updated.submission_id\n    RETURNING id\n)\nSELECT updated.status AS outcome, updated.*, audit.id AS audit_event_id\nFROM updated LEFT JOIN audit ON true;",
+          "options": {
+            "queryReplacement": "={{ [ $json.id, $json.delivery_error ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          960,
+          96
+        ],
+        "id": "6f528d16-6259-593f-8e7c-5e4b73ff15ad",
+        "name": "Schedule Retry or Dead Letter"
+      }
+    ],
+    "connections": {
+      "Run Worker Manually": {
+        "main": [
+          [
+            {
+              "node": "Claim One Due Job",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Every Five Minutes": {
+        "main": [
+          [
+            {
+              "node": "Claim One Due Job",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claim One Due Job": {
+        "main": [
+          [
+            {
+              "node": "Perform Synthetic Delivery",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Perform Synthetic Delivery": {
+        "main": [
+          [
+            {
+              "node": "Delivery Succeeded?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delivery Succeeded?": {
+        "main": [
+          [
+            {
+              "node": "Mark Job Sent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Schedule Retry or Dead Letter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": {},
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

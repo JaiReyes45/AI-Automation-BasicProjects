@@ -1,0 +1,1013 @@
+[
+  {
+    "id": "p05HubSpotSyncV1",
+    "name": "20 - HubSpot CRM Sync Template",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          -96
+        ],
+        "id": "6df54c59-7a6e-50a3-8399-ce938b94f518",
+        "name": "When clicking Execute workflow"
+      },
+      {
+        "parameters": {
+          "mode": "raw",
+          "jsonOutput": "{\n  \"submission_id\": \"d6f71a82-3c49-4a5b-9e20-7f3c8d1a6b42\"\n}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          240,
+          -96
+        ],
+        "id": "77920be5-ebed-5525-ba59-38b749ef2187",
+        "name": "Synthetic CRM Input"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          112
+        ],
+        "id": "73ea46d7-d52c-534b-ab2f-0a5842640ce2",
+        "name": "Receive CRM-Ready Lead"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n  id AS submission_record_id,\n  submission_id,\n  correlation_id,\n  email_normalized,\n  normalized_payload,\n  ai_extraction,\n  lead_score,\n  qualification,\n  processing_status\nFROM lead_crm.lead_submissions\nWHERE submission_id = $1::uuid\n  AND processing_status = 'CRM_SYNC_PENDING';",
+          "options": {
+            "queryReplacement": "={{ $json.submission_id }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          480,
+          0
+        ],
+        "id": "583cc990-3572-5eee-bc8a-72dc0e39d549",
+        "name": "Fetch CRM-Ready Lead"
+      },
+      {
+        "parameters": {
+          "jsCode": "const row = $input.first().json;\nconst payload = typeof row.normalized_payload === 'string' ? JSON.parse(row.normalized_payload) : (row.normalized_payload || {});\nconst aiExtraction = typeof row.ai_extraction === 'string' ? JSON.parse(row.ai_extraction) : (row.ai_extraction || {});\n\nconst email = String(row.email_normalized || payload.email || '').trim().toLowerCase();\nconst website = String(payload.website || '').trim();\nconst companyName = String(payload.company_name || 'Unknown Company').trim();\nconst qualification = String(row.qualification || 'WARM').trim().toUpperCase();\nconst needSummary = String(aiExtraction.need_summary || payload.message || 'CRM opportunity').trim();\n\nlet companyDomain = website.trim();\nif (companyDomain.toLowerCase().startsWith('https://')) companyDomain = companyDomain.slice(8);\nelse if (companyDomain.toLowerCase().startsWith('http://')) companyDomain = companyDomain.slice(7);\nif (companyDomain.toLowerCase().startsWith('www.')) companyDomain = companyDomain.slice(4);\ncompanyDomain = companyDomain.split('/')[0].split('?')[0].split('#')[0].split(':')[0].trim();\nif (!companyDomain) companyDomain = String(row.submission_id) + '.synthetic.invalid';\n\nconst leadStatusByQualification = { HOT: 'IN_PROGRESS', WARM: 'OPEN', COLD: 'NEW' };\n\nreturn [{\n  json: {\n    ...row,\n    ai_extraction: aiExtraction,\n    hubspot_contact: {\n      idProperty: 'email',\n      id: email,\n      properties: {\n        email,\n        firstname: String(payload.first_name || '').trim(),\n        lastname: String(payload.last_name || '').trim(),\n        phone: String(payload.phone || '').trim(),\n        jobtitle: String(payload.job_title || '').trim(),\n        company: companyName,\n        hs_lead_status: leadStatusByQualification[qualification] || 'NEW',\n        hubspot_owner_id: '100128796'\n      }\n    },\n    hubspot_company: {\n      properties: {\n        name: companyName,\n        domain: companyDomain,\n        website: website || undefined\n      }\n    },\n    hubspot_deal: qualification === 'HOT' ? {\n    properties: {\n    dealname: (companyName + ' - ' + needSummary).slice(0, 150),\n    amount: String(payload.budget_amount ?? ''),\n    dealstage: 'appointmentscheduled',\n    pipeline: 'default',\n    hubspot_owner_id: '100128796',\n    p05_submission_id: String(row.submission_id)\n    }\n  } : null,\n    qualification\n  }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          720,
+          0
+        ],
+        "id": "dce4885f-84ac-5d18-beb0-440e432db4d2",
+        "name": "Build HubSpot Payloads"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "90746cc7-96f7-4335-90e4-f13d211f2cc9",
+                "leftValue": "={{ $('Build HubSpot Payloads').first().json.qualification === 'HOT' }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1408,
+          -32
+        ],
+        "id": "ec18a798-3f1a-4d62-abde-5cc2d6c88158",
+        "name": "Is HOT Lead?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "35dfe2e9-aa83-5c03-89b1-7948d52ad23d",
+                "name": "success",
+                "value": "={{ $json.processing_status === 'CRM_SYNCED' }}",
+                "type": "boolean"
+              },
+              {
+                "id": "d6241627-6835-5da9-88c7-8c3c42414000",
+                "name": "outcome",
+                "value": "=CRM_SYNCED",
+                "type": "string"
+              },
+              {
+                "id": "6cb38c90-66dd-43cb-8bda-beb200165348",
+                "name": "submission_id",
+                "value": "={{ $json.submission_id }}",
+                "type": "string"
+              },
+              {
+                "id": "8ffe8495-6fc0-446e-a0e6-5271dbdbe270",
+                "name": "qualification",
+                "value": "={{ $('Build HubSpot Payloads').first().json.qualification }}",
+                "type": "string"
+              },
+              {
+                "id": "2350272a-d004-4718-83f7-28a521f27aed",
+                "name": "contact_synced",
+                "value": true,
+                "type": "boolean"
+              },
+              {
+                "id": "7fd55269-4afb-4296-84fa-35c726e3ec22",
+                "name": "company_synced",
+                "value": true,
+                "type": "boolean"
+              },
+              {
+                "id": "12d4898d-cd6b-4de2-8a76-ca069b07e3a6",
+                "name": "deal_synced",
+                "value": "={{ $('Build HubSpot Payloads').first().json.qualification === 'HOT' }}",
+                "type": "boolean"
+              },
+              {
+                "id": "a02ddf7a-ccdc-4fde-9f79-9a4faf00a813",
+                "name": "crm_provider",
+                "value": "={{ $json.crm_provider }}",
+                "type": "string"
+              },
+              {
+                "id": "4595e569-9b15-4f4f-9de1-60d8299c31e2",
+                "name": "should_continue",
+                "value": false,
+                "type": "boolean"
+              },
+              {
+                "id": "133db61b-5684-4e20-8666-84fa72200626",
+                "name": "hubspot_deal_id",
+                "value": "={{ $json.crm_deal_id }}",
+                "type": "string"
+              },
+              {
+                "id": "93ffe62d-949a-4551-bb5d-f83e0cb0fa7d",
+                "name": "submission_record_id",
+                "value": "={{ $json.submission_record_id }}",
+                "type": "string"
+              },
+              {
+                "id": "0e4f2efa-6884-4596-b748-8bc3840342b1",
+                "name": "hubspot_contact_id",
+                "value": "={{ $json.crm_contact_id }}",
+                "type": "string"
+              },
+              {
+                "id": "2e00911a-3e9d-4e5c-8372-e6ed508bffac",
+                "name": "hubspot_company_id",
+                "value": "={{ $json.crm_company_id }}",
+                "type": "string"
+              },
+              {
+                "id": "70b84c89-4aaa-4e36-9c45-83abac9128f1",
+                "name": "processing_status",
+                "value": "={{ $json.processing_status }}",
+                "type": "string"
+              },
+              {
+                "id": "21d95192-cfa5-464a-8de7-50496fefe860",
+                "name": "crm_synced_at",
+                "value": "={{ $json.crm_synced_at }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          2432,
+          32
+        ],
+        "id": "82b415bc-41ac-514b-b573-b3f8a284ecc9",
+        "name": "CRM Sync Complete"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.hubapi.com/crm/v3/objects/contacts/batch/upsert",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  inputs: [\n    $('Build HubSpot Payloads').first().json.hubspot_contact\n  ]\n}) }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          976,
+          0
+        ],
+        "id": "2179511b-c550-5d72-bebd-5b783bbe8f65",
+        "name": "HubSpot Contact Upsert",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.hubapi.com/crm/v3/objects/deals",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify(\n  $('Build HubSpot Payloads').first().json.hubspot_deal\n) }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1616,
+          -352
+        ],
+        "id": "49b013ca-4138-5dea-aace-10cb202dfa8f",
+        "name": "HubSpot Deal Create",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  filterGroups: [\n    {\n      filters: [\n        {\n          propertyName: 'domain',\n          operator: 'EQ',\n          value: $('Build HubSpot Payloads').first().json.hubspot_company.properties.domain\n        }\n      ]\n    }\n  ],\n  properties: ['name', 'domain', 'website'],\n  limit: 1\n}) }}",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1200,
+          -16
+        ],
+        "id": "00c96d73-8f9f-5053-bbf2-1d5c49378bd0",
+        "name": "Search HubSpot Company",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.hubapi.com/crm/v3/objects/companies",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  properties: $('Build HubSpot Payloads').first().json.hubspot_company.properties\n}) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1600,
+          384
+        ],
+        "id": "616651a6-5d9f-4d28-8792-f96ad5d3be21",
+        "name": "Create HubSpot Company",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "4c695b1f-eb30-42bd-b1ef-343a797ab2d7",
+                "leftValue": "={{ Array.isArray($json.results) && $json.results.length > 0 }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1408,
+          144
+        ],
+        "id": "649d4315-ad62-4449-a278-4cdedfc124be",
+        "name": "Company Already Exists?"
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ 'https://api.hubapi.com/crm/v3/objects/companies/' + $('Search HubSpot Company').first().json.results[0].id }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  properties: $('Build HubSpot Payloads').first().json.hubspot_company.properties\n}) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1664,
+          160
+        ],
+        "id": "f7b6ca4d-e124-4ca8-b5be-2682f28ca608",
+        "name": "Update HubSpot Company",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{ 'https://api.hubapi.com/crm/v3/objects/contacts/' + $('HubSpot Contact Upsert').first().json.results[0].id + '/associations/companies/' + $json.id + '/1' }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1904,
+          176
+        ],
+        "id": "85583cfb-44e5-477a-aed7-157be04c16d0",
+        "name": "Associate Primary Company (Existing)",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{ 'https://api.hubapi.com/crm/v3/objects/contacts/' + $('HubSpot Contact Upsert').first().json.results[0].id + '/associations/companies/' + $json.id + '/1' }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1872,
+          400
+        ],
+        "id": "5ea2c9fc-3bf7-4fd6-8e0c-0753b873c1a8",
+        "name": "Associate Primary Company (New)",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{\n  'https://api.hubapi.com/crm/v3/objects/deals/'\n  + (\n      Number($('Search Existing HubSpot Deal').first().json.total || 0) > 0\n        ? $('Search Existing HubSpot Deal').first().json.results[0].id\n        : $('HubSpot Deal Create').first().json.id\n    )\n  + '/associations/contacts/'\n  + $('HubSpot Contact Upsert').first().json.results[0].id\n  + '/3'\n}}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1888,
+          -352
+        ],
+        "id": "efa8f6b8-e693-47e3-a7a2-5343ba449831",
+        "name": "Associate Deal to Contact",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "PUT",
+          "url": "={{\n  'https://api.hubapi.com/crm/v3/objects/deals/'\n  + (\n      Number($('Search Existing HubSpot Deal').first().json.total || 0) > 0\n        ? $('Search Existing HubSpot Deal').first().json.results[0].id\n        : $('HubSpot Deal Create').first().json.id\n    )\n  + '/associations/companies/'\n  + (Number($('Search HubSpot Company').first().json.total || 0) > 0\n  ? $('Search HubSpot Company').first().json.results[0].id\n  : $('Create HubSpot Company').first().json.id)\n  + '/5'\n}}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2096,
+          -352
+        ],
+        "id": "9abef68c-7b61-4aa2-aac8-f82a6a3cf161",
+        "name": "Associate Deal to Primary Company",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  filterGroups: [\n    {\n      filters: [\n        {\n          propertyName: 'p05_submission_id',\n          operator: 'EQ',\n          value: $('Build HubSpot Payloads').first().json.submission_id\n        }\n      ]\n    }\n  ],\n  properties: [\n    'dealname',\n    'amount',\n    'dealstage',\n    'pipeline',\n    'hubspot_owner_id',\n    'p05_submission_id'\n  ],\n  limit: 1\n}) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          1696,
+          -192
+        ],
+        "id": "65f0274a-9803-462c-8802-a0b3c6acc5ff",
+        "name": "Search Existing HubSpot Deal",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "4ceb578a-82bc-4bd6-b2ba-744228b2225f",
+                "leftValue": "={{  Number($json.total || 0) > 0 }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1904,
+          -192
+        ],
+        "id": "269bd92c-21c1-45c0-af01-5ebc87af83d2",
+        "name": "Deal Already Exists?"
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{   'https://api.hubapi.com/crm/v3/objects/deals/'   + $('Search Existing HubSpot Deal').first().json.results[0].id }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({\n  properties: $('Build HubSpot Payloads').first().json.hubspot_deal.properties\n}) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "position": [
+          2256,
+          -208
+        ],
+        "id": "19c8a1cd-1364-4517-b877-4a7e5536ae97",
+        "name": "Update Existing HubSpot Deal",
+        "onError": "continueErrorOutput"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE lead_crm.lead_submissions\nSET\n  processing_status = 'CRM_SYNCED',\n  crm_provider = 'hubspot',\n  crm_contact_id = $2,\n  crm_company_id = $3,\n  crm_deal_id = $4,\n  crm_synced_at = NOW(),\n  crm_sync_error = NULL,\n  updated_at = NOW()\nWHERE id = $1::uuid\nRETURNING\n  id AS submission_record_id,\n  submission_id,\n  processing_status,\n  crm_provider,\n  crm_contact_id,\n  crm_company_id,\n  crm_deal_id,\n  crm_synced_at;",
+          "options": {
+            "queryReplacement": "={{ [\n  $('Build HubSpot Payloads').first().json.submission_record_id,\n  $('HubSpot Contact Upsert').first().json.results[0].id,\n  (Number($('Search HubSpot Company').first().json.total || 0) > 0\n  ? $('Search HubSpot Company').first().json.results[0].id\n  : $('Create HubSpot Company').first().json.id),\n  $('Build HubSpot Payloads').first().json.qualification === 'HOT'\n    ? (\n        Number($('Search Existing HubSpot Deal').first().json.total || 0) > 0\n          ? $('Search Existing HubSpot Deal').first().json.results[0].id\n          : $('HubSpot Deal Create').first().json.id\n      )\n    : null\n] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          2160,
+          16
+        ],
+        "id": "e273ffa8-5f8c-44c9-b375-cfb30f206b03",
+        "name": "Persist CRM Sync Success"
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "const source = $('Build HubSpot Payloads').first().json;\n\nconst rawError =\n  $json.error ||\n  $json.cause ||\n  $json;\n\nconst message = String(\n  rawError.message ||\n  $json.message ||\n  'HubSpot CRM synchronization failed'\n).slice(0, 1000);\n\nconst statusCode =\n  Number(\n    rawError.status ||\n    rawError.response?.status ||\n    rawError.statusCode ||\n    rawError.httpCode ||\n    $json.status ||\n    $json.statusCode ||\n    $json.httpCode ||\n    0\n  ) || null;\n\nconst category =\n  rawError.category ||\n  rawError.code ||\n  $json.category ||\n  $json.code ||\n  null;\n\nconst failedNode =\n  rawError.node?.name ||\n  $json.node?.name ||\n  'HubSpot CRM request';\n\nreturn {\n  json: {\n    submission_record_id: source.submission_record_id,\n    submission_id: source.submission_id,\n    correlation_id: source.correlation_id,\n    processing_status: 'SYNC_FAILED',\n    crm_provider: 'hubspot',\n    failed_node: failedNode,\n    crm_sync_error: {\n      message,\n      status_code: statusCode,\n      category,\n      occurred_at: new Date().toISOString()\n    },\n    should_continue: false\n  }\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          592,
+          368
+        ],
+        "id": "b1d372b0-dcd7-4b96-9fd6-f82667edd444",
+        "name": "Build CRM Failure Record"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE lead_crm.lead_submissions\nSET\n  processing_status = 'SYNC_FAILED',\n  crm_provider = 'hubspot',\n  crm_sync_error = $2::jsonb,\n  crm_synced_at = NULL,\n  updated_at = NOW()\nWHERE id = $1::uuid\nRETURNING\n  id AS submission_record_id,\n  submission_id,\n  correlation_id,\n  processing_status,\n  crm_provider,\n  crm_sync_error,\n  updated_at;",
+          "options": {
+            "queryReplacement": "={{ [\n  $json.submission_record_id,\n  JSON.stringify({\n    ...$json.crm_sync_error,\n    failed_node: $json.failed_node\n  })\n] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          816,
+          368
+        ],
+        "id": "06cd6a79-b1aa-439b-b24c-4575672a96ac",
+        "name": "Persist CRM Sync Failure"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bf5f6e7a-a4b4-4a5c-9544-448a98b842c4",
+                "name": "success",
+                "value": false,
+                "type": "boolean"
+              },
+              {
+                "id": "2ce38d12-97ec-4f15-938d-e4f242b0c915",
+                "name": "outcome",
+                "value": "CRM_SYNC_FAILED",
+                "type": "string"
+              },
+              {
+                "id": "9a31fe81-b31c-464a-bccc-d7574b9b445b",
+                "name": "submission_id",
+                "value": "={{ $json.submission_id }}",
+                "type": "string"
+              },
+              {
+                "id": "87d7b581-4a8a-4d2e-98ab-152e60381067",
+                "name": "submission_record_id",
+                "value": "={{ $json.submission_record_id }}",
+                "type": "string"
+              },
+              {
+                "id": "4bee235a-5044-4da2-af29-232a2b0f8e17",
+                "name": "correlation_id",
+                "value": "={{ $json.correlation_id }}",
+                "type": "string"
+              },
+              {
+                "id": "7a28e943-66f4-423d-9a4a-a2454b2d9377",
+                "name": "processing_status",
+                "value": "={{ $json.processing_status }}",
+                "type": "string"
+              },
+              {
+                "id": "ae66f36a-2161-4745-90eb-2bbc6ff16a99",
+                "name": "crm_provider",
+                "value": "={{ $json.crm_provider }}",
+                "type": "string"
+              },
+              {
+                "id": "36eef3f6-5fd2-47a6-90bf-065c227d9d03",
+                "name": "failed_node",
+                "value": "={{ $json.crm_sync_error.failed_node || \"HubSpot CRM request\" }}",
+                "type": "string"
+              },
+              {
+                "id": "53286913-d25d-4de7-8492-972ea34fde14",
+                "name": "error_message",
+                "value": "={{ $json.crm_sync_error.message }}",
+                "type": "string"
+              },
+              {
+                "id": "d25d6082-17f3-47ca-b5d4-1f025526f555",
+                "name": "error_status_code",
+                "value": "={{ $json.crm_sync_error.status_code }}",
+                "type": "string"
+              },
+              {
+                "id": "25319874-950b-4030-864f-54e72ff31d1d",
+                "name": "failed_at",
+                "value": "={{ $json.crm_sync_error.occurred_at }}",
+                "type": "string"
+              },
+              {
+                "id": "0961ae3c-6993-4de2-a772-f4f668c11bf8",
+                "name": "should_continue",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1040,
+          368
+        ],
+        "id": "d36ed753-8e19-4ee2-8113-6c899068017d",
+        "name": "CRM Sync Failed"
+      }
+    ],
+    "connections": {
+      "When clicking Execute workflow": {
+        "main": [
+          [
+            {
+              "node": "Synthetic CRM Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Synthetic CRM Input": {
+        "main": [
+          [
+            {
+              "node": "Fetch CRM-Ready Lead",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Receive CRM-Ready Lead": {
+        "main": [
+          [
+            {
+              "node": "Fetch CRM-Ready Lead",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch CRM-Ready Lead": {
+        "main": [
+          [
+            {
+              "node": "Build HubSpot Payloads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build HubSpot Payloads": {
+        "main": [
+          [
+            {
+              "node": "HubSpot Contact Upsert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is HOT Lead?": {
+        "main": [
+          [
+            {
+              "node": "Search Existing HubSpot Deal",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Persist CRM Sync Success",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HubSpot Contact Upsert": {
+        "main": [
+          [
+            {
+              "node": "Search HubSpot Company",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HubSpot Deal Create": {
+        "main": [
+          [
+            {
+              "node": "Associate Deal to Contact",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Search HubSpot Company": {
+        "main": [
+          [
+            {
+              "node": "Company Already Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Company Already Exists?": {
+        "main": [
+          [
+            {
+              "node": "Update HubSpot Company",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create HubSpot Company",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update HubSpot Company": {
+        "main": [
+          [
+            {
+              "node": "Associate Primary Company (Existing)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create HubSpot Company": {
+        "main": [
+          [
+            {
+              "node": "Associate Primary Company (New)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Associate Deal to Contact": {
+        "main": [
+          [
+            {
+              "node": "Associate Deal to Primary Company",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Associate Deal to Primary Company": {
+        "main": [
+          [
+            {
+              "node": "Persist CRM Sync Success",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Search Existing HubSpot Deal": {
+        "main": [
+          [
+            {
+              "node": "Deal Already Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Deal Already Exists?": {
+        "main": [
+          [
+            {
+              "node": "Update Existing HubSpot Deal",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "HubSpot Deal Create",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Existing HubSpot Deal": {
+        "main": [
+          [
+            {
+              "node": "Associate Deal to Contact",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CRM Sync Complete": {
+        "main": [
+          []
+        ]
+      },
+      "Persist CRM Sync Success": {
+        "main": [
+          [
+            {
+              "node": "CRM Sync Complete",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build CRM Failure Record": {
+        "main": [
+          [
+            {
+              "node": "Persist CRM Sync Failure",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Persist CRM Sync Failure": {
+        "main": [
+          [
+            {
+              "node": "CRM Sync Failed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Associate Primary Company (Existing)": {
+        "main": [
+          [
+            {
+              "node": "Is HOT Lead?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Associate Primary Company (New)": {
+        "main": [
+          [
+            {
+              "node": "Is HOT Lead?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Build CRM Failure Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

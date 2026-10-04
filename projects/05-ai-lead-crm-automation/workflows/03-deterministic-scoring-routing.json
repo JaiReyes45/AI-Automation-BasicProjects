@@ -1,0 +1,279 @@
+[
+  {
+    "id": "p05ScoringRouteV1",
+    "name": "03 - Deterministic Scoring and Routing",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          -120
+        ],
+        "id": "6df54c59-7a6e-50a3-8399-ce938b94f518",
+        "name": "When clicking Execute workflow"
+      },
+      {
+        "parameters": {
+          "mode": "raw",
+          "jsonOutput": "{\"submission_record_id\":\"1c6b649e-a504-491f-852e-88f99d99c73c\",\"should_continue\":true}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          240,
+          -120
+        ],
+        "id": "104419e9-3000-5a2c-bbda-83902a6189e2",
+        "name": "Synthetic Scoring Input"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          80
+        ],
+        "id": "aeb3b6f2-5107-5e83-adfb-4e0e0c21baa5",
+        "name": "Receive Extracted Lead"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n    lead.id AS submission_record_id,\n    lead.submission_id,\n    lead.correlation_id,\n    lead.processing_status,\n    lead.email_normalized,\n    lead.normalized_payload,\n    lead.ai_extraction,\n    lead.ai_confidence,\n    contact.id AS known_contact_id,\n    company.id AS known_company_id,\n    company.lifecycle_stage AS known_company_lifecycle,\n    (contact.id IS NOT NULL) AS existing_contact_match,\n    (company.lifecycle_stage IN ('ACTIVE_CLIENT', 'FORMER_CLIENT')) AS returning_client\nFROM lead_crm.lead_submissions AS lead\nLEFT JOIN lead_crm.contacts AS contact\n    ON contact.email_normalized = lead.email_normalized\nLEFT JOIN lead_crm.companies AS company\n    ON company.id = contact.company_id\nWHERE lead.id = $1::uuid\n  AND lead.processing_status = 'SCORING';",
+          "options": {
+            "queryReplacement": "={{ [ $json.submission_record_id ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          480,
+          0
+        ],
+        "id": "e7d26d85-e898-5f0f-8fa7-429132c717ef",
+        "name": "Fetch Lead Context"
+      },
+      {
+        "parameters": {
+          "jsCode": "const row = $json;\nconst payload = typeof row.normalized_payload === 'string' ? JSON.parse(row.normalized_payload) : (row.normalized_payload || {});\nconst ai = typeof row.ai_extraction === 'string' ? JSON.parse(row.ai_extraction) : (row.ai_extraction || {});\n\nconst servicePoints = {\n  crm_lead_automation: 25,\n  invoice_approval_automation: 25,\n  customer_service_automation: 25,\n  reporting_data_integration: 15,\n  general_automation: 5,\n  unrelated: 0,\n  unknown: 0,\n};\nconst service_fit = servicePoints[ai.service_category] ?? 0;\n\nlet budget_fit = 0;\nif ((payload.budget_currency || 'PHP') === 'PHP' && Number.isFinite(Number(payload.budget_amount))) {\n  const budget = Number(payload.budget_amount);\n  budget_fit = budget >= 150000 ? 20 : budget >= 100000 ? 15 : budget >= 50000 ? 10 : budget > 0 ? 3 : 0;\n}\n\nlet company_size_fit = 0;\nif (Number.isFinite(Number(payload.company_size))) {\n  const size = Number(payload.company_size);\n  company_size_fit = size >= 20 && size <= 200 ? 15 : (size >= 10 && size <= 19) || (size >= 201 && size <= 500) ? 8 : size > 0 ? 3 : 0;\n}\n\nconst timelinePoints = { within_30_days: 15, days_31_90: 10, over_90_days: 5, not_stated: 0 };\nconst timeline_fit = timelinePoints[ai.purchase_timeline] ?? 0;\nconst rolePoints = { decision_maker: 10, champion: 5, unclear: 0 };\nconst decision_maker_fit = rolePoints[ai.decision_maker_status] ?? 0;\n\nconst email = String(row.email_normalized || '').toLowerCase();\nconst domain = email.includes('@') ? email.split('@').pop() : '';\nconst freeDomains = new Set(['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com']);\nconst business_email_fit = domain ? (freeDomains.has(domain) ? 3 : 10) : 0;\nconst market_fit = (ai.location_country_code || payload.country_code) === 'PH' ? 5 : 0;\n\nconst score_breakdown = { service_fit, budget_fit, company_size_fit, timeline_fit, decision_maker_fit, business_email_fit, market_fit };\nconst lead_score = Object.values(score_breakdown).reduce((total, value) => total + value, 0);\nlet qualification = lead_score >= 70 && service_fit >= 15 ? 'HOT' : lead_score >= 40 ? 'WARM' : 'COLD';\n\nconst review_reasons = [];\nif (Number(row.ai_confidence ?? ai.confidence ?? 0) < 0.65) review_reasons.push('LOW_AI_CONFIDENCE');\nconst country = ai.location_country_code || payload.country_code || null;\nif (country && country !== 'PH') review_reasons.push('OUTSIDE_PRIMARY_MARKET');\n\nreturn [{ json: {\n  ...row,\n  normalized_payload: payload,\n  ai_extraction: ai,\n  score_breakdown,\n  lead_score,\n  qualification,\n  scoring_rule_version: 'v1',\n  review_reasons,\n  requires_human_review: review_reasons.length > 0,\n  relationship_type: row.returning_client ? 'RETURNING_CLIENT' : 'NEW_BUSINESS',\n  target_status: review_reasons.length ? 'REVIEW_REQUIRED' : 'CRM_SYNC_PENDING',\n} }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          720,
+          0
+        ],
+        "id": "f8906247-167e-5f63-9eb9-3c56c42f32c7",
+        "name": "Calculate Deterministic Score"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH current_record AS (\n    SELECT id, submission_id, correlation_id, processing_status\n    FROM lead_crm.lead_submissions\n    WHERE id = $1::uuid AND processing_status = 'SCORING'\n), updated AS (\n    UPDATE lead_crm.lead_submissions AS lead\n    SET lead_score = $2::integer,\n        qualification = $3,\n        scoring_rule_version = $4,\n        processing_status = $5,\n        updated_at = NOW()\n    FROM current_record\n    WHERE lead.id = current_record.id\n    RETURNING lead.*\n), review_items AS (\n    INSERT INTO lead_crm.review_queue (submission_id, reason_code, reason_detail)\n    SELECT updated.id, reason.value,\n           jsonb_build_object('score', updated.lead_score, 'qualification', updated.qualification)\n    FROM updated\n    CROSS JOIN jsonb_array_elements_text($6::jsonb) AS reason(value)\n    ON CONFLICT DO NOTHING\n    RETURNING id\n), audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id, submission_id, event_type, actor_type, from_status, to_status, event_data\n    )\n    SELECT updated.correlation_id, updated.id, 'LEAD_SCORED', 'WORKFLOW',\n           'SCORING', updated.processing_status,\n           jsonb_build_object('score', updated.lead_score, 'qualification', updated.qualification,\n                              'rule_version', updated.scoring_rule_version, 'breakdown', $7::jsonb,\n                              'relationship_type', $8)\n    FROM updated\n    RETURNING id\n), crm_job AS (\n    INSERT INTO lead_crm.outbox_jobs (\n        idempotency_key, submission_id, job_type, destination, payload\n    )\n    SELECT 'crm-sync:' || updated.id::text, updated.id, 'CRM_SYNC', 'hubspot',\n           jsonb_build_object('submission_record_id', updated.id, 'qualification', updated.qualification,\n                              'relationship_type', $8)\n    FROM updated\n    WHERE updated.processing_status = 'CRM_SYNC_PENDING'\n    ON CONFLICT (idempotency_key) DO NOTHING\n    RETURNING id\n), notification_job AS (\n    INSERT INTO lead_crm.outbox_jobs (\n        idempotency_key, submission_id, job_type, destination, payload\n    )\n    SELECT 'sales-notification:' || updated.id::text, updated.id, 'SALES_NOTIFICATION', 'mailpit',\n           jsonb_build_object('submission_record_id', updated.id, 'lead_score', updated.lead_score,\n                              'qualification', updated.qualification, 'synthetic', true)\n    FROM updated\n    WHERE updated.processing_status = 'CRM_SYNC_PENDING' AND updated.qualification = 'HOT'\n    ON CONFLICT (idempotency_key) DO NOTHING\n    RETURNING id\n)\nSELECT\n    'SCORED' AS outcome,\n    updated.submission_id,\n    updated.id AS submission_record_id,\n    updated.correlation_id,\n    updated.lead_score,\n    updated.qualification,\n    updated.scoring_rule_version,\n    updated.processing_status,\n    $7::jsonb AS score_breakdown,\n    $6::jsonb AS review_reasons,\n    $8 AS relationship_type,\n    (updated.processing_status = 'CRM_SYNC_PENDING') AS should_continue,\n    audit.id AS audit_event_id,\n    (SELECT id FROM crm_job LIMIT 1) AS crm_outbox_job_id,\n    (SELECT id FROM notification_job LIMIT 1) AS notification_outbox_job_id\nFROM updated CROSS JOIN audit;",
+          "options": {
+            "queryReplacement": "={{ [ $json.submission_record_id, $json.lead_score, $json.qualification, $json.scoring_rule_version, $json.target_status, JSON.stringify($json.review_reasons), JSON.stringify($json.score_breakdown), $json.relationship_type ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          960,
+          0
+        ],
+        "id": "c829b58d-f069-5062-9e57-7ec2421241e7",
+        "name": "Persist Score and Route"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "ad449a2e-1c6d-5264-bd0e-0bfa0df394f9",
+                "leftValue": "={{ $json.should_continue }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1200,
+          0
+        ],
+        "id": "8736f11c-8bf5-59a8-9461-708738f67bf1",
+        "name": "Continue to CRM?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "9b2d1d67-7fb3-5d51-9e38-0115aee4d577",
+                "name": "pipeline_action",
+                "value": "READY_FOR_CRM",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1440,
+          -80
+        ],
+        "id": "58ac4acd-7a65-5613-85d5-175c830fcc4f",
+        "name": "Ready for CRM Result"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "601c4f2e-2179-5fd5-a823-a7d870fa5cc8",
+                "name": "pipeline_action",
+                "value": "HUMAN_REVIEW_REQUIRED",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1440,
+          96
+        ],
+        "id": "a2f7af55-a12c-5e63-aa60-e5a11b08b23c",
+        "name": "Human Review Result"
+      }
+    ],
+    "connections": {
+      "When clicking Execute workflow": {
+        "main": [
+          [
+            {
+              "node": "Synthetic Scoring Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Synthetic Scoring Input": {
+        "main": [
+          [
+            {
+              "node": "Fetch Lead Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Receive Extracted Lead": {
+        "main": [
+          [
+            {
+              "node": "Fetch Lead Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Lead Context": {
+        "main": [
+          [
+            {
+              "node": "Calculate Deterministic Score",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calculate Deterministic Score": {
+        "main": [
+          [
+            {
+              "node": "Persist Score and Route",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Persist Score and Route": {
+        "main": [
+          [
+            {
+              "node": "Continue to CRM?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Continue to CRM?": {
+        "main": [
+          [
+            {
+              "node": "Ready for CRM Result",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Human Review Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": {},
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

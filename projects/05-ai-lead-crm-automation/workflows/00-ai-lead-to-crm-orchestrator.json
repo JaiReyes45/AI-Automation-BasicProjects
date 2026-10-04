@@ -1,0 +1,468 @@
+[
+  {
+    "id": "bbXRGYkgxNhEwshx",
+    "name": "00 - AI Lead -to-CRM Orchestrator",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          32,
+          -128
+        ],
+        "id": "61dc4c39-90f6-4301-9fc4-3131402fbeaf",
+        "name": "When clicking ‘Execute workflow’"
+      },
+      {
+        "parameters": {
+          "mode": "raw",
+          "jsonOutput": "{\n  \"submission_id\": \"4e28a5b7-8f1c-4d93-a6e2-0c9f7b3145aa\",\n  \"submitted_at\": \"2026-10-03T09:00:00Z\",\n  \"first_name\": \"Kobe\",\n  \"last_name\": \"Bryant\",\n  \"email\": \"kobe@example.com\",\n  \"phone\": \"+63 912 345 6789\",\n  \"company_name\": \"Automation404\",\n  \"job_title\": \"CEO\",\n  \"company_size\": 1000,\n  \"website\": \"https://kobe.co.com\",\n  \"country_code\": \"PH\",\n  \"budget_currency\": \"PHP\",\n  \"budget_amount\": 500000,\n  \"message\": \"We need lead intake and CRM automation deployed within 30 days. I own the company and have authority to approve the implementation.\",\n  \"consent\": true,\n  \"source\": \"test_client\"\n}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          208,
+          -128
+        ],
+        "id": "be5c2010-ce8d-411f-b05a-fa64d2e41387",
+        "name": "Synthetic Lead Input"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "ZBXdwNy1N5WweeMT",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/ZBXdwNy1N5WweeMT",
+            "cachedResultName": "01 - Intake, Validation, and Persistence"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          432,
+          0
+        ],
+        "id": "2d6a6de0-745f-4c35-adfa-8567481ac7a6",
+        "name": "Run Intake Processor"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          16,
+          176
+        ],
+        "id": "da05c659-4e29-4feb-9779-4daba4f8e229",
+        "name": "Called by Input Trigger"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "2f268f13-5e07-4ec7-a49b-051f7c01766f",
+                "leftValue": "={{ $json.should_continue }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          672,
+          0
+        ],
+        "id": "81e82eb8-31d5-4d3e-abaf-785fd8611150",
+        "name": "Continue Processing?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "cd9cd872-d8ff-47c4-85b3-18070f330003",
+                "name": "pipeline_action",
+                "value": "STOPPED_AFTER_INTAKE",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          912,
+          64
+        ],
+        "id": "349a1e11-d230-4cdc-97ce-21229882faad",
+        "name": "Intake Stopped Result"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "p05AiExtractV1",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/p05AiExtractV1",
+            "cachedResultName": "02 - Local AI Extraction and Validation"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          912,
+          -96
+        ],
+        "id": "584a1690-6b1c-549c-b764-a64ef72ecf8a",
+        "name": "Run Local AI Extraction"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "a54d13d4-df28-502c-9d4e-5f5f6b94577d",
+                "leftValue": "={{ $json.should_continue }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1152,
+          -96
+        ],
+        "id": "3709597c-c4e9-598e-8118-3894eaae5753",
+        "name": "Continue After AI?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "d43e440e-1a0d-5f3d-9cec-7a6281a41e31",
+                "name": "pipeline_action",
+                "value": "STOPPED_AFTER_AI",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1392,
+          0
+        ],
+        "id": "5e80a03a-ecd9-5d68-a616-31eacfbf7d13",
+        "name": "AI Stopped Result"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "p05ScoringRouteV1",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/p05ScoringRouteV1",
+            "cachedResultName": "03 - Deterministic Scoring and Routing"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          1392,
+          -176
+        ],
+        "id": "c4acab6b-8081-519a-866c-2dfd4877ea52",
+        "name": "Run Deterministic Scoring"
+      },
+      {
+        "parameters": {
+          "workflowId": {
+            "__rl": true,
+            "value": "p05HubSpotSyncV1",
+            "mode": "list",
+            "cachedResultUrl": "/workflow/p05HubSpotSyncV1",
+            "cachedResultName": "20 - HubSpot CRM Sync Template"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {},
+            "matchingColumns": [],
+            "schema": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          1856,
+          -240
+        ],
+        "id": "7a7ff9da-c961-45c0-be8b-38bd54bf12d2",
+        "name": "Call '20 - HubSpot CRM Sync Template'"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "d43e440e-1a0d-5f3d-9cec-7a6281a41e31",
+                "name": "pipeline_action",
+                "value": "STOPPED_BEFORE_CRM",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1536,
+          144
+        ],
+        "id": "78b14c10-0871-44ec-85d8-48ea47119d1b",
+        "name": "CRM Stopped Result"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "4737c93b-c17b-416b-a547-e73ea8d8d386",
+                "leftValue": "={{ $json.should_continue === true &&\n   $json.processing_status === 'CRM_SYNC_PENDING' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1616,
+          -176
+        ],
+        "id": "7e1d096a-db80-4a14-b4ac-7e6a7eab1365",
+        "name": "Continue to CRM?"
+      }
+    ],
+    "connections": {
+      "When clicking ‘Execute workflow’": {
+        "main": [
+          [
+            {
+              "node": "Synthetic Lead Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Synthetic Lead Input": {
+        "main": [
+          []
+        ]
+      },
+      "Run Intake Processor": {
+        "main": [
+          [
+            {
+              "node": "Continue Processing?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Called by Input Trigger": {
+        "main": [
+          [
+            {
+              "node": "Run Intake Processor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Continue Processing?": {
+        "main": [
+          [
+            {
+              "node": "Run Local AI Extraction",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Intake Stopped Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Local AI Extraction": {
+        "main": [
+          [
+            {
+              "node": "Continue After AI?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Continue After AI?": {
+        "main": [
+          [
+            {
+              "node": "Run Deterministic Scoring",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "AI Stopped Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Deterministic Scoring": {
+        "main": [
+          [
+            {
+              "node": "Continue to CRM?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Continue to CRM?": {
+        "main": [
+          [
+            {
+              "node": "Call '20 - HubSpot CRM Sync Template'",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "CRM Stopped Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "meta": {
+      "instanceId": "cfb7a6e3cf59382ac367b515d32a1943e2e6f9bca5c148504f908bd110fb6176"
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]

@@ -1,0 +1,519 @@
+[
+  {
+    "id": "ZBXdwNy1N5WweeMT",
+    "name": "01 - Intake, Validation, and Persistence",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "id": "c055762a-8fe7-4141-a639-df2372f30060",
+        "typeVersion": 1.1,
+        "name": "Receive Lead Payload",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "position": [
+          272,
+          352
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const crypto = require('crypto');\n\nconst uuidPattern =\n  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst allowedSources = new Set([\n  'website_form',\n  'demo_form',\n  'test_client',\n  'gmail',\n]);\n\nfunction text(value) {\n  return typeof value === 'string' ? value.trim() : '';\n}\n\nfunction optionalText(value) {\n  const normalized = text(value);\n  return normalized || null;\n}\n\nfunction stableStringify(value) {\n  if (value === null || typeof value !== 'object') {\n    return JSON.stringify(value);\n  }\n\n  if (Array.isArray(value)) {\n    return `[${value.map(stableStringify).join(',')}]`;\n  }\n\n  const keys = Object.keys(value).sort();\n\n  return `{${keys\n    .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)\n    .join(',')}}`;\n}\n\nfunction validHttpUrl(value) {\n  if (!value) return true;\n  if (typeof value !== 'string') return false;\n\n  const candidate = value.trim();\n\n  return /^https?:\\/\\/[a-z0-9.-]+(?::\\d{1,5})?(?:[/?#][^\\s]*)?$/i.test(\n    candidate,\n  );\n}\n\nreturn $input.all().map((item) => {\n  const raw = JSON.parse(JSON.stringify(item.json));\n  const validationErrors = [];\n\n  const submissionId = text(raw.submission_id);\n  const submittedAt = text(raw.submitted_at);\n  const firstName = text(raw.first_name);\n  const lastName = text(raw.last_name);\n  const emailOriginal = text(raw.email);\n  const emailNormalized = emailOriginal.toLowerCase();\n  const companyName = text(raw.company_name);\n  const message = text(raw.message);\n  const source = text(raw.source);\n\n  const jobTitle = optionalText(raw.job_title);\n  const website = optionalText(raw.website);\n  const phone = optionalText(raw.phone);\n  const countryCode = optionalText(raw.country_code)?.toUpperCase() ?? null;\n  const budgetCurrency =\n    optionalText(raw.budget_currency)?.toUpperCase() ?? null;\n\n  const companySize =\n    raw.company_size === undefined || raw.company_size === null\n      ? null\n      : raw.company_size;\n\n  const budgetAmount =\n    raw.budget_amount === undefined || raw.budget_amount === null\n      ? null\n      : raw.budget_amount;\n\n  const submissionIdValid = uuidPattern.test(submissionId);\n\n  function addError(field, code, messageText) {\n    validationErrors.push({\n      field,\n      code,\n      message: messageText,\n    });\n  }\n\n  if (!submissionIdValid) {\n    addError(\n      'submission_id',\n      'invalid_uuid',\n      'submission_id must be a valid UUID',\n    );\n  }\n\n  if (\n    !submittedAt ||\n    !/^\\d{4}-\\d{2}-\\d{2}T/.test(submittedAt) ||\n    Number.isNaN(Date.parse(submittedAt))\n  ) {\n    addError(\n      'submitted_at',\n      'invalid_timestamp',\n      'submitted_at must be a valid ISO 8601 timestamp',\n    );\n  }\n\n  if (firstName.length < 1 || firstName.length > 100) {\n    addError(\n      'first_name',\n      'invalid_length',\n      'first_name must contain 1 to 100 characters',\n    );\n  }\n\n  if (lastName.length < 1 || lastName.length > 100) {\n    addError(\n      'last_name',\n      'invalid_length',\n      'last_name must contain 1 to 100 characters',\n    );\n  }\n\n  if (!emailPattern.test(emailNormalized) || emailNormalized.length > 320) {\n    addError(\n      'email',\n      'invalid_email',\n      'email must be syntactically valid',\n    );\n  }\n\n  if (companyName.length < 1 || companyName.length > 150) {\n    addError(\n      'company_name',\n      'invalid_length',\n      'company_name must contain 1 to 150 characters',\n    );\n  }\n\n  if (message.length < 20 || message.length > 2000) {\n    addError(\n      'message',\n      'invalid_length',\n      'message must contain 20 to 2000 characters',\n    );\n  }\n\n  if (raw.consent !== true) {\n    addError(\n      'consent',\n      'consent_required',\n      'consent must be true',\n    );\n  }\n\n  if (!allowedSources.has(source)) {\n    addError(\n      'source',\n      'invalid_source',\n      'source is not allowed',\n    );\n  }\n\n  if (\n    companySize !== null &&\n    (!Number.isInteger(companySize) || companySize <= 0)\n  ) {\n    addError(\n      'company_size',\n      'invalid_integer',\n      'company_size must be a positive integer',\n    );\n  }\n\n  if (\n    budgetAmount !== null &&\n    (typeof budgetAmount !== 'number' ||\n      !Number.isFinite(budgetAmount) ||\n      budgetAmount < 0)\n  ) {\n    addError(\n      'budget_amount',\n      'invalid_number',\n      'budget_amount must be zero or a positive number',\n    );\n  }\n\n  if (website && !validHttpUrl(website)) {\n    addError(\n      'website',\n      'invalid_url',\n      'website must be a valid HTTP or HTTPS URL',\n    );\n  }\n\n  if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) {\n    addError(\n      'country_code',\n      'invalid_country_code',\n      'country_code must contain two uppercase letters',\n    );\n  }\n\n  if (budgetCurrency && !/^[A-Z]{3}$/.test(budgetCurrency)) {\n    addError(\n      'budget_currency',\n      'invalid_currency',\n      'budget_currency must contain three uppercase letters',\n    );\n  }\n\n  if (jobTitle && jobTitle.length > 150) {\n    addError(\n      'job_title',\n      'invalid_length',\n      'job_title must not exceed 150 characters',\n    );\n  }\n\n  const normalizedPayload = {\n    submission_id: submissionId,\n    submitted_at: submittedAt,\n    first_name: firstName,\n    last_name: lastName,\n    email: emailNormalized,\n    company_name: companyName,\n    job_title: jobTitle,\n    company_size: companySize,\n    website,\n    phone,\n    country_code: countryCode,\n    budget_currency: budgetCurrency,\n    budget_amount: budgetAmount,\n    message,\n    consent: raw.consent,\n    source,\n  };\n\n  const payloadHash = crypto\n    .createHash('sha256')\n    .update(stableStringify(normalizedPayload))\n    .digest('hex');\n\n  const isValid = validationErrors.length === 0;\n\n  return {\n    json: {\n      ...normalizedPayload,\n      email_original: emailOriginal,\n      email_normalized: emailNormalized,\n      correlation_id: crypto.randomUUID(),\n      raw_payload: raw,\n      normalized_payload: normalizedPayload,\n      payload_hash: payloadHash,\n      validation_errors: validationErrors,\n      submission_id_valid: submissionIdValid,\n      is_valid: isValid,\n      target_status: isValid ? 'AI_PENDING' : 'INVALID',\n    },\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          496,
+          352
+        ],
+        "id": "d677294d-3d23-482c-8c16-03d1e5d42806",
+        "name": "Normalize and Validate Lead"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "0802d205-148d-4f19-82e5-3b39eaed99f1",
+                "leftValue": "={{ $json.submission_id_valid }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "or"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          720,
+          352
+        ],
+        "id": "f489c67e-fbf9-4e06-b23d-df02d4888d5d",
+        "name": "Submission ID Valid?"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n    existing.id IS NOT NULL AS submission_exists,\n    existing.id AS existing_record_id,\n    existing.correlation_id AS existing_correlation_id,\n    existing.payload_hash AS existing_payload_hash,\n    existing.processing_status AS existing_processing_status\nFROM (VALUES (1)) AS seed(value)\nLEFT JOIN lead_crm.lead_submissions AS existing\n    ON existing.submission_id = $1::uuid;",
+          "options": {
+            "queryReplacement": "={{ [$json.submission_id]}}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          864,
+          208
+        ],
+        "id": "152ea9f0-e2d5-4592-a295-eb05fbc31a28",
+        "name": "Find Existing Submission"
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "combineByPosition",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          1072,
+          352
+        ],
+        "id": "b3197506-e03a-41cc-a685-11ce698cdf58",
+        "name": "Combine Lead and Lookup"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "49c00979-e725-42b6-91bc-d77ea2b45988",
+                "leftValue": "={{ $json.submission_exists }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1296,
+          352
+        ],
+        "id": "0fa32c65-96ce-4bcd-988f-cb48ae2213d1",
+        "name": "Submission Already Exists?"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH inserted AS (\n    INSERT INTO lead_crm.lead_submissions (\n        submission_id,\n        correlation_id,\n        source,\n        submitted_at,\n        email_normalized,\n        message,\n        consent,\n        raw_payload,\n        normalized_payload,\n        payload_hash,\n        processing_status,\n        validation_errors\n    )\n    VALUES (\n        $1::uuid,\n        $2::uuid,\n        $3,\n        $4::timestamptz,\n        $5,\n        $6,\n        $7::boolean,\n        $8::jsonb,\n        $9::jsonb,\n        $10,\n        $11,\n        $12::jsonb\n    )\n    ON CONFLICT (submission_id) DO NOTHING\n    RETURNING\n        id,\n        submission_id,\n        payload_hash,\n        processing_status,\n        created_at\n),\ncreated_audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id,\n        submission_id,\n        event_type,\n        actor_type,\n        from_status,\n        to_status,\n        event_data\n    )\n    SELECT\n        $2::uuid,\n        inserted.id,\n        CASE\n            WHEN $11 = 'INVALID' THEN 'LEAD_REJECTED'\n            ELSE 'LEAD_ACCEPTED'\n        END,\n        'WORKFLOW',\n        'VALIDATING',\n        $11,\n        jsonb_build_object(\n            'payload_hash', $10,\n            'validation_errors', $12::jsonb\n        )\n    FROM inserted\n    RETURNING id\n)\nSELECT\n    true AS record_created,\n    inserted.id AS submission_record_id,\n    inserted.submission_id,\n    inserted.payload_hash AS stored_payload_hash,\n    inserted.processing_status,\n    inserted.created_at,\n    (SELECT id FROM created_audit) AS audit_event_id\nFROM inserted\n\nUNION ALL\n\nSELECT\n    false AS record_created,\n    existing.id AS submission_record_id,\n    existing.submission_id,\n    existing.payload_hash AS stored_payload_hash,\n    existing.processing_status,\n    existing.created_at,\n    NULL::bigint AS audit_event_id\nFROM lead_crm.lead_submissions AS existing\nWHERE existing.submission_id = $1::uuid\n  AND NOT EXISTS (SELECT 1 FROM inserted)\n\nLIMIT 1;",
+          "options": {
+            "queryReplacement": "={{ [   $json.submission_id,   $json.correlation_id,   $json.source,   $json.submitted_at,   $json.email_normalized || null,   $json.message || null,   $json.consent,   JSON.stringify($json.raw_payload),   JSON.stringify($json.normalized_payload),   $json.payload_hash,   $json.target_status,   JSON.stringify($json.validation_errors) ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          1488,
+          528
+        ],
+        "id": "2c285b6b-be89-457f-8f94-8db914e1b018",
+        "name": "Persist New Submission"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "77b657ea-d2f2-4983-a7d4-34b44b7c4c59",
+                "leftValue": "={{ $json.payload_hash }}",
+                "rightValue": "={{ $json.existing_payload_hash }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1488,
+          176
+        ],
+        "id": "ad06ca68-cd87-402e-94c0-692e065568d7",
+        "name": "Same Payload Hash?"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "bfce705b-b826-489a-9c5c-5a00108863f6",
+                "name": "outcome",
+                "value": "=IDEMPOTENT_REPEAT",
+                "type": "string"
+              },
+              {
+                "id": "a0f8c96f-1953-469c-88c7-35db8272e075",
+                "name": "submission_id",
+                "value": "={{ $json.submission_id }}",
+                "type": "string"
+              },
+              {
+                "id": "7660e1ce-1265-4165-a61d-5aaa3f52f64e",
+                "name": "submission_record_id",
+                "value": "={{ $json.existing_record_id }}",
+                "type": "string"
+              },
+              {
+                "id": "fa129bbc-6b86-4dc8-863d-4a88a9b148f3",
+                "name": "correlation_id",
+                "value": "={{ $json.existing_correlation_id }}",
+                "type": "string"
+              },
+              {
+                "id": "d4df63f0-f357-4438-903b-badacb3abfac",
+                "name": "processing_status",
+                "value": "={{ $json.existing_processing_status }}",
+                "type": "string"
+              },
+              {
+                "id": "c537b39c-c50f-4628-8a18-cd7f63de432f",
+                "name": "payload_hash",
+                "value": "={{ $json.existing_payload_hash }}",
+                "type": "string"
+              },
+              {
+                "id": "7a2effae-1df0-4a79-9deb-5226b18a87c7",
+                "name": "record_created",
+                "value": "={{ false }}",
+                "type": "boolean"
+              },
+              {
+                "id": "bc31869a-b12d-4f7e-8189-09b11e869941",
+                "name": "should_continue",
+                "value": "={{ false }}",
+                "type": "boolean"
+              },
+              {
+                "id": "cd282512-979b-4742-a00a-a36d5216c86a",
+                "name": "audit_event_id",
+                "value": "={{ $json.audit_event_id }}",
+                "type": "number"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          2000,
+          96
+        ],
+        "id": "6293d7d1-b0cd-48f6-827f-1950246d3100",
+        "name": "Idempotent Repeat Result"
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "combineByPosition",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          1696,
+          432
+        ],
+        "id": "128eddf7-5be4-4784-ad2b-50cefcabb39e",
+        "name": "Combine Lead and New Record"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "9489c379-6443-4e23-b6d8-b6935acba39d",
+                "name": "outcome",
+                "value": "={{ $json.is_valid ? 'CREATED' : 'INVALID' }}",
+                "type": "string"
+              },
+              {
+                "id": "f846bbea-48fe-4f19-a751-40214b0a15d7",
+                "name": "=should_continue",
+                "value": "={{ $json.is_valid }}",
+                "type": "boolean"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.5,
+        "position": [
+          1920,
+          432
+        ],
+        "id": "9d5a8d5b-6ec4-4460-8aaa-9a184bdb5f5f",
+        "name": "New Submission Result"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO lead_crm.audit_events (\n    correlation_id,\n    submission_id,\n    event_type,\n    actor_type,\n    from_status,\n    to_status,\n    event_data\n)\nVALUES (\n    $1::uuid,\n    NULL,\n    'INVALID_SUBMISSION_ID',\n    'WORKFLOW',\n    'VALIDATING',\n    'INVALID',\n    jsonb_build_object(\n        'provided_submission_id', $2,\n        'validation_errors', $3::jsonb,\n        'raw_payload', $4::jsonb\n    )\n)\nRETURNING\n    id AS audit_event_id,\n    'INVALID_SUBMISSION_ID' AS outcome,\n    $2 AS submission_id,\n    $1::uuid AS correlation_id,\n    'INVALID' AS processing_status,\n    $3::jsonb AS validation_errors,\n    false AS record_created,\n    false AS should_continue;",
+          "options": {
+            "queryReplacement": "={{ [   $json.correlation_id,   $json.submission_id,   JSON.stringify($json.validation_errors),   JSON.stringify($json.raw_payload) ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          960,
+          560
+        ],
+        "id": "8b31c88d-bcd9-4088-8827-cd3bed459df3",
+        "name": "Record Invalid Submission ID"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH audit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id,\n        submission_id,\n        event_type,\n        actor_type,\n        from_status,\n        to_status,\n        event_data\n    )\n    VALUES (\n        $6::uuid,\n        $2::uuid,\n        'IDEMPOTENT_REPEAT',\n        'WORKFLOW',\n        $4,\n        $4,\n        jsonb_build_object(\n            'original_correlation_id', $3::uuid,\n            'payload_hash', $5\n        )\n    )\n    RETURNING id\n)\nSELECT\n    $1 AS submission_id,\n    $2::uuid AS existing_record_id,\n    $3::uuid AS existing_correlation_id,\n    $4 AS existing_processing_status,\n    $5 AS existing_payload_hash,\n    audit.id AS audit_event_id\nFROM audit;",
+          "options": {
+            "queryReplacement": "={{ [   $json.submission_id,   $json.existing_record_id,   $json.existing_correlation_id,   $json.existing_processing_status,   $json.existing_payload_hash,   $json.correlation_id ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          1776,
+          96
+        ],
+        "id": "101555fa-3f25-4751-abc4-ea2432b7e383",
+        "name": "Record Idempotent Repeat"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH updated AS (\n    UPDATE lead_crm.lead_submissions\n    SET\n        processing_status = 'REVIEW_REQUIRED',\n        updated_at = NOW()\n    WHERE id = $1::uuid\n    RETURNING\n        id,\n        submission_id,\n        correlation_id,\n        processing_status\n),\naudit AS (\n    INSERT INTO lead_crm.audit_events (\n        correlation_id,\n        submission_id,\n        event_type,\n        actor_type,\n        from_status,\n        to_status,\n        event_data\n    )\n    SELECT\n        $3::uuid,\n        updated.id,\n        'SUBMISSION_ID_PAYLOAD_CONFLICT',\n        'WORKFLOW',\n        $2,\n        'REVIEW_REQUIRED',\n        jsonb_build_object(\n            'original_correlation_id', updated.correlation_id,\n            'stored_payload_hash', $4,\n            'attempted_payload_hash', $5,\n            'attempted_raw_payload', $6::jsonb,\n            'attempted_normalized_payload', $7::jsonb\n        )\n    FROM updated\n    RETURNING id\n)\nSELECT\n    'SUBMISSION_ID_CONFLICT' AS outcome,\n    updated.submission_id,\n    updated.id AS submission_record_id,\n    updated.correlation_id AS original_correlation_id,\n    $3::uuid AS attempted_correlation_id,\n    updated.processing_status,\n    false AS record_created,\n    false AS should_continue,\n    audit.id AS audit_event_id\nFROM updated\nCROSS JOIN audit;",
+          "options": {
+            "queryReplacement": "={{ [   $json.existing_record_id,   $json.existing_processing_status,   $json.correlation_id,   $json.existing_payload_hash,   $json.payload_hash,   JSON.stringify($json.raw_payload),   JSON.stringify($json.normalized_payload) ] }}"
+          }
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.7,
+        "position": [
+          1760,
+          272
+        ],
+        "id": "fc4f4667-5435-49bb-9e0d-ba2da1a78ad3",
+        "name": "Flag Submission Conflict"
+      }
+    ],
+    "connections": {
+      "Receive Lead Payload": {
+        "main": [
+          [
+            {
+              "node": "Normalize and Validate Lead",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Normalize and Validate Lead": {
+        "main": [
+          [
+            {
+              "node": "Submission ID Valid?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Submission ID Valid?": {
+        "main": [
+          [
+            {
+              "node": "Find Existing Submission",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Combine Lead and Lookup",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Record Invalid Submission ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Existing Submission": {
+        "main": [
+          [
+            {
+              "node": "Combine Lead and Lookup",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Combine Lead and Lookup": {
+        "main": [
+          [
+            {
+              "node": "Submission Already Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Submission Already Exists?": {
+        "main": [
+          [
+            {
+              "node": "Same Payload Hash?",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Persist New Submission",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Combine Lead and New Record",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Same Payload Hash?": {
+        "main": [
+          [
+            {
+              "node": "Record Idempotent Repeat",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Flag Submission Conflict",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Persist New Submission": {
+        "main": [
+          [
+            {
+              "node": "Combine Lead and New Record",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Combine Lead and New Record": {
+        "main": [
+          [
+            {
+              "node": "New Submission Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Idempotent Repeat Result": {
+        "main": [
+          []
+        ]
+      },
+      "Record Idempotent Repeat": {
+        "main": [
+          [
+            {
+              "node": "Idempotent Repeat Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": false,
+      "binaryMode": "separate"
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "nodeGroups": [],
+    "pinData": {},
+    "sourceWorkflowId": null,
+    "tags": [],
+    "versionMetadata": {
+      "name": "V1",
+      "description": ""
+    }
+  }
+]
