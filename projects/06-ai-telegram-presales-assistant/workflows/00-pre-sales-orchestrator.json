@@ -1,0 +1,452 @@
+{
+  "id": "p06Workflow00",
+  "name": "00 \u2014 Pre-Sales Orchestrator",
+  "active": false,
+  "nodes": [
+    {
+      "id": "26b70beb-6211-521e-ba49-834a1950ec61",
+      "name": "Recovery Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0513300f-4c0d-5b5a-92d4-192bcfb6bac1",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "04631b2f-775c-59a3-a279-f322cdca1a38",
+      "name": "Claim Inbox",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT presales.claim_inbox() AS result;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      }
+    },
+    {
+      "id": "3d3bb048-a0ed-50a4-a252-ecc270779a8b",
+      "name": "Claimed Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $json.result?[{json:$json.result}]:[];"
+      }
+    },
+    {
+      "id": "d1a92210-1d76-5d1b-9bb3-ced164a97f52",
+      "name": "Run 03",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow03",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f23ab501-daeb-51ac-9105-c62f8e3063ab",
+      "name": "Run 04",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow04",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "b95546d9-9e09-55ca-9336-3497b08ae781",
+      "name": "Run 05",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow05",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "41ab4123-f211-5ecb-b486-9ccbefbd02b1",
+      "name": "Run 06",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow06",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "4397445d-cad7-5c3e-85e1-c29ee7c69353",
+      "name": "Run 07",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow07",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "ad2e776f-6fc6-5539-a08b-85958284f0b3",
+      "name": "Run 08",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "p06Workflow08",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "passThrough",
+          "value": {}
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e6d9e837-ca31-5bf3-a5ba-800b054bed39",
+      "name": "Commit Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT presales.commit_decision($1::bigint,$2::uuid,$3::jsonb) AS result;",
+        "options": {
+          "queryReplacement": "={{ [$json.update_id,$json.lease_token,JSON.stringify($json.decision)] }}"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "889f0177-52fe-5a2f-a05d-a00a6eb7f290",
+      "name": "Safe Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c=$('Claimed Context').first().json; return [{json:{update_id:c.update_id,lease_token:c.lease_token}}];"
+      }
+    },
+    {
+      "id": "d793582e-b2bf-5478-9b0e-dcb3fcdeec47",
+      "name": "Retry Failed Decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT presales.fail_inbox($1::bigint,$2::uuid,'decision_processing_failed',true) AS result;",
+        "options": {
+          "queryReplacement": "={{ [$json.update_id,$json.lease_token] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recovery Schedule": {
+      "main": [
+        [
+          {
+            "node": "Claim Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Claim Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Inbox": {
+      "main": [
+        [
+          {
+            "node": "Claimed Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claimed Context": {
+      "main": [
+        [
+          {
+            "node": "Run 03",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 03": {
+      "main": [
+        [
+          {
+            "node": "Run 04",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 04": {
+      "main": [
+        [
+          {
+            "node": "Run 05",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 05": {
+      "main": [
+        [
+          {
+            "node": "Run 06",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 06": {
+      "main": [
+        [
+          {
+            "node": "Run 07",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 07": {
+      "main": [
+        [
+          {
+            "node": "Run 08",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run 08": {
+      "main": [
+        [
+          {
+            "node": "Commit Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit Decision": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Safe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safe Failure": {
+      "main": [
+        [
+          {
+            "node": "Retry Failed Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "tags": []
+}

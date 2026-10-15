@@ -1,0 +1,57 @@
+{
+  "id": "p06Workflow11",
+  "name": "11 \u2014 Analytics and Audit",
+  "active": false,
+  "nodes": [
+    {
+      "id": "0513300f-4c0d-5b5a-92d4-192bcfb6bac1",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2e0b13dc-4b3e-5cf0-9ebb-adfcdf716954",
+      "name": "Aggregate Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object('inquiries',(SELECT count(*) FROM presales.messages WHERE direction='incoming'),'leads',(SELECT count(*) FROM presales.leads),'handoffs',(SELECT count(*) FROM presales.handoff_tickets),'pending_outbox',(SELECT count(*) FROM presales.outbox_jobs WHERE status IN ('pending','retry_wait')),'dead_letters',(SELECT count(*) FROM presales.dead_letter_events WHERE replay_status='pending')) AS metrics;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,7 @@
+"""Print deployment health and aggregate counts, never secrets or customer identifiers."""
+import subprocess,json
+def run(args,**kw):return subprocess.run(args,text=True,capture_output=True,check=True,**kw)
+sql="""SELECT json_build_object('services',(SELECT count(*) FROM presales.services WHERE active AND approved),'packages',(SELECT count(*) FROM presales.service_packages WHERE active AND approved),'adjustments',(SELECT count(*) FROM presales.pricing_adjustments WHERE active AND approved),'customers',(SELECT count(*) FROM presales.customers),'inbox_status',(SELECT json_object_agg(status,n) FROM (SELECT status,count(*) n FROM presales.inbox_jobs GROUP BY status) q),'outbox_status',(SELECT json_object_agg(status,n) FROM (SELECT status,count(*) n FROM presales.outbox_jobs GROUP BY status) q),'owner_configured',EXISTS(SELECT 1 FROM presales.runtime_settings WHERE key='owner_chat_id'),'workflow_states',(SELECT json_agg(json_build_object('name',name,'active',active)) FROM workflow_entity WHERE id LIKE 'p06Workflow%'));"""
+print(run(['docker','exec','-i','project06-presales-postgres-1','psql','-U','presales','-d','presales','-At'],input=sql).stdout)
+js="""(async()=>{for(const [name,url] of [['local','http://127.0.0.1:5678/healthz'],['public',process.env.WEBHOOK_URL+'healthz']]){try{const r=await fetch(url,{signal:AbortSignal.timeout(15000)});console.log(name+'_health_http',r.status);}catch(e){console.log(name+'_unreachable',e.cause?.code||e.name);}}})();"""
+print(run(['docker','exec','-i','project06-presales-n8n-1','node'],input=js).stdout)

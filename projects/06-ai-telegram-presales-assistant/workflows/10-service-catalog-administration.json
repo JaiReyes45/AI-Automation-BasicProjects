@@ -1,0 +1,57 @@
+{
+  "id": "p06Workflow10",
+  "name": "10 \u2014 Service Catalog Administration",
+  "active": false,
+  "nodes": [
+    {
+      "id": "0513300f-4c0d-5b5a-92d4-192bcfb6bac1",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5cba97ff-5a0f-52a2-8b42-6f88c47b6751",
+      "name": "Review Catalog",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT code,name,price_min,price_max,active FROM presales.services ORDER BY category,code;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Review Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "tags": []
+}

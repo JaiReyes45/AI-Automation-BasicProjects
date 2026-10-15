@@ -1,0 +1,57 @@
+{
+  "id": "p06Workflow12",
+  "name": "12 \u2014 Failure Retry and Replay",
+  "active": false,
+  "nodes": [
+    {
+      "id": "0513300f-4c0d-5b5a-92d4-192bcfb6bac1",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ada66e44-1257-5bb1-8098-98df30c6a6b6",
+      "name": "Review Failed Work",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id,source_type,error_message,replay_status,created_at FROM presales.dead_letter_events WHERE replay_status='pending' ORDER BY created_at;",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Review Failed Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 300
+  },
+  "pinData": {},
+  "tags": []
+}

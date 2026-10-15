@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.runtime/
+backups/
+*.dump
+*.sql.gz
+# Workstation-specific staging helper; not part of a portable installation.
+scripts/sync_source.py
+*.log
+screenshots/*.png
+screenshots/*.jpg
+__pycache__/
+node_modules/

@@ -1,0 +1,5 @@
+services:
+  n8n:
+    environment:
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:${N8N_PORT:-5686}/}
+      N8N_PROXY_HOPS: 1
