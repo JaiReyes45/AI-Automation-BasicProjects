@@ -1,0 +1,424 @@
+{
+  "id": "project07Scenario",
+  "name": "Project 07 \u00b7 03 End-to-end duplicate and recovery test",
+  "active": false,
+  "nodes": [
+    {
+      "id": "execute-manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "synthetic-email",
+      "name": "Synthetic email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const run = Date.now().toString();\nreturn [{json:{account:'demo@example.test', id:'demo-'+run, thread_id:'thread-'+run,\nreceived_at:new Date().toISOString(),\nbody:'Company: Example Labs\\nRole: QA Engineer Intern\\nReference: APP-'+run+'\\nWe have received your application.'}}];"
+      }
+    },
+    {
+      "id": "save-submission",
+      "name": "Save submission",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "replay-same-email",
+      "name": "Replay same email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Synthetic email').first().json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "verify-duplicate",
+      "name": "Verify duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "if (!$json.duplicate || $json.application_id !== $('Save submission').first().json.application_id) throw new Error('Duplicate invariant failed'); return [{json:$json}];"
+      }
+    },
+    {
+      "id": "receive-interview",
+      "name": "Receive interview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({...$('Synthetic email').first().json,id:$('Synthetic email').first().json.id+'-interview',received_at:new Date(Date.now()+1000).toISOString(),body:'We invite you to an interview.'}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "verify-advancement",
+      "name": "Verify advancement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "jsCode": "if ($json.action !== 'update' || $json.classification.stage !== 'interview') throw new Error('Interview advancement failed'); return [{json:$json}];"
+      }
+    },
+    {
+      "id": "simulate-mailbox-outage",
+      "name": "Simulate mailbox outage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/deliver",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"inject_failure\":true}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "verify-visible-failure",
+      "name": "Verify visible failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "jsCode": "if ($json.failed !== 1) throw new Error('Fault injection was not observed'); return [{json:$json}];"
+      }
+    },
+    {
+      "id": "retry-delivery",
+      "name": "Retry delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/deliver",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "passed",
+      "name": "Passed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "if (($json.outbox.failed||0)+($json.outbox.dead||0)>0) throw new Error('Recovery failed'); return [{json:{result:'PASS',duplicate_verified:true,interview_verified:true,recovery_verified:true,gmail_connected:false,status:$json}}];"
+      }
+    },
+    {
+      "id": "inspect-failure-and-retry",
+      "name": "Inspect failure and retry",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        600,
+        560
+      ],
+      "parameters": {
+        "errorMessage": "Workflow stopped. Inspect the failed HTTP node. Fix its input or service health, then retry; message IDs prevent duplicate records."
+      }
+    },
+    {
+      "id": "read-before-running",
+      "name": "Read before running",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Project 07 \u2014 synthetic mailbox only\nNo Gmail access. HTTP steps call a private Docker service. Application state and label jobs are durable. Workflows stay inactive; use Execute workflow. Live OAuth and Gmail labels are D3.2.",
+        "height": 180,
+        "width": 650
+      }
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Synthetic email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthetic email": {
+      "main": [
+        [
+          {
+            "node": "Save submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save submission": {
+      "main": [
+        [
+          {
+            "node": "Replay same email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay same email": {
+      "main": [
+        [
+          {
+            "node": "Verify duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify duplicate": {
+      "main": [
+        [
+          {
+            "node": "Receive interview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive interview": {
+      "main": [
+        [
+          {
+            "node": "Verify advancement",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify advancement": {
+      "main": [
+        [
+          {
+            "node": "Simulate mailbox outage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate mailbox outage": {
+      "main": [
+        [
+          {
+            "node": "Verify visible failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify visible failure": {
+      "main": [
+        [
+          {
+            "node": "Retry delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry delivery": {
+      "main": [
+        [
+          {
+            "node": "Passed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {}
+}

@@ -1,0 +1,7 @@
+{
+  "account": "demo@example.test",
+  "id": "demo-submission-007",
+  "thread_id": "demo-thread-007",
+  "received_at": "2026-10-23T10:00:00+08:00",
+  "body": "Company: Example Labs\nRole: QA Engineer Intern\nReference: APP-007\n\nWe have received your application."
+}

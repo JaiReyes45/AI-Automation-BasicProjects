@@ -1,0 +1,18 @@
+[
+  {"name":"submission", "body":"We have received your application.", "stage":"submitted", "reason":null},
+  {"name":"negated submission", "body":"We have not received your application.", "stage":null, "reason":"uncertain_language"},
+  {"name":"review", "body":"Your application is being reviewed by the employer.", "stage":"reviewing", "reason":null},
+  {"name":"information", "body":"Please share your portfolio link.", "stage":"information", "reason":null},
+  {"name":"assessment", "body":"Please complete our technical assessment.", "stage":"assessment", "reason":null},
+  {"name":"interview", "body":"We invite you to an interview.", "stage":"interview", "reason":null},
+  {"name":"offer", "body":"We are pleased to offer you the position.", "stage":"offer", "reason":null},
+  {"name":"rejection", "body":"You have not been selected for this role.", "stage":"rejected", "reason":null},
+  {"name":"recommended vacancy", "body":"Jobs you may like: QA Engineer Intern", "stage":null, "reason":"opportunity_only"},
+  {"name":"unrelated", "body":"Your receipt is ready.", "stage":null, "reason":"unrecognized_message"},
+  {"name":"quoted confirmation", "body":"You have not been selected.\nOn Thursday, Recruiter wrote:\nWe received your application.", "stage":"rejected", "reason":null},
+  {"name":"html quotation", "body":"<p>We invite you to an interview.</p><blockquote>We received your application.</blockquote>", "stage":"interview", "reason":null},
+  {"name":"conflicting stages", "body":"We received your application. We invite you to an interview.", "stage":null, "reason":"conflicting_signals"},
+  {"name":"conditional interview", "body":"If successful, we will invite you to an interview.", "stage":null, "reason":"uncertain_language"},
+  {"name":"negated offer", "body":"This is not an offer of employment.", "stage":null, "reason":"uncertain_language"},
+  {"name":"conflicting roles", "body":"Role: IT Intern\nRole: QA Engineer Intern\nWe received your application.", "stage":null, "reason":"conflicting_identity"}
+]

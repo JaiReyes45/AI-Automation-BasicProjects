@@ -1,0 +1,128 @@
+{
+  "id": "project07Delivery",
+  "name": "Project 07 \u00b7 02 Simulated label delivery",
+  "active": false,
+  "nodes": [
+    {
+      "id": "execute-manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "deliver-pending-label-jobs",
+      "name": "Deliver pending label jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://engine:8765/deliver",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "verify-delivery",
+      "name": "Verify delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "jsCode": "if (($json.outbox.failed || 0) + ($json.outbox.dead || 0) > 0) throw new Error('Label delivery needs attention. Retry transient failed jobs; inspect dead jobs.'); return [{json:$json}];"
+      }
+    },
+    {
+      "id": "inspect-failure-and-retry",
+      "name": "Inspect failure and retry",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        600,
+        560
+      ],
+      "parameters": {
+        "errorMessage": "Workflow stopped. Inspect the failed HTTP node. Fix its input or service health, then retry; message IDs prevent duplicate records."
+      }
+    },
+    {
+      "id": "read-before-running",
+      "name": "Read before running",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "content": "## Project 07 \u2014 synthetic mailbox only\nNo Gmail access. HTTP steps call a private Docker service. Application state and label jobs are durable. Workflows stay inactive; use Execute workflow. Live OAuth and Gmail labels are D3.2.",
+        "height": 180,
+        "width": 650
+      }
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Deliver pending label jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deliver pending label jobs": {
+      "main": [
+        [
+          {
+            "node": "Verify delivery",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Inspect failure and retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {}
+}

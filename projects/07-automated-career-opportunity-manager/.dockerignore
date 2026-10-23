@@ -1,0 +1,11 @@
+**
+!docker/
+!docker/**
+!build/
+!build/web/
+!build/web/**
+!workflow/
+!workflow/**
+
+!profile_service/
+!profile_service/**

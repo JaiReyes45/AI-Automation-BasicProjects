@@ -1,0 +1,29 @@
+[
+  {
+    "workflow": "project07Intake",
+    "status": "success",
+    "last_node": "Review result"
+  },
+  {
+    "workflow": "project07Delivery",
+    "status": "success",
+    "last_node": "Verify delivery"
+  },
+  {
+    "workflow": "project07Scenario",
+    "status": "success",
+    "last_node": "Passed",
+    "checks": {
+      "result": "PASS",
+      "duplicate_verified": true,
+      "interview_verified": true,
+      "recovery_verified": true,
+      "gmail_connected": false
+    }
+  },
+  {
+    "workflow": "project07ExpectedFailure",
+    "status": "error",
+    "last_node": "Inspect failure and retry"
+  }
+]

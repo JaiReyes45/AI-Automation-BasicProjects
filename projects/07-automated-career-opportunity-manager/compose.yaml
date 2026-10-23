@@ -1,0 +1,90 @@
+name: project07-automated-career-opportunity-manager
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - profile
+    ports:
+      - "127.0.0.1:8087:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  profile:
+    build:
+      context: .
+      dockerfile: docker/profile.Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./local-data/profile:/data
+
+  postgres:
+    profiles: [automation]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: careerflow
+      POSTGRES_USER: careerflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup_local.py first}
+      TZ: Asia/Manila
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careerflow -d careerflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - project07_postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    profiles: [automation]
+    image: docker.n8n.io/n8nio/n8n:2.34.5
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: careerflow
+      DB_POSTGRESDB_USER: careerflow
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup_local.py first}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Run scripts/setup_local.py first}
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: false
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: Asia/Manila
+      TZ: Asia/Manila
+    volumes:
+      - project07_n8n_data:/home/node/.n8n
+      - ./workflows:/projects/07-automated-career-opportunity-manager/workflows:ro
+
+  engine:
+    profiles: [automation]
+    build:
+      context: .
+      dockerfile: docker/engine.Dockerfile
+    restart: unless-stopped
+    environment:
+      CAREERFLOW_WORKFLOW_TOKEN: ${CAREERFLOW_WORKFLOW_TOKEN:?Run scripts/setup_local.py first}
+    volumes:
+      - project07_engine_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  project07_postgres_data:
+  project07_n8n_data:
+  project07_engine_data:

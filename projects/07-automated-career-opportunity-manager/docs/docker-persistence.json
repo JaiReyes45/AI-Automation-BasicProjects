@@ -1,0 +1,13 @@
+{
+  "restart_persistence": "PASS",
+  "status": {
+    "applications": 3,
+    "events": 5,
+    "messages": 5,
+    "review_items": 0,
+    "outbox": {
+      "delivered": 5
+    },
+    "gmail_connected": false
+  }
+}
