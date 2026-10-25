@@ -274,7 +274,9 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
     setState(() => editing = false);
   }
 
-  void save() {
+  bool saving = false;
+  Future<void> save() async {
+    if (saving) return;
     if (!form.currentState!.validate()) return;
     final old = record;
     final next = action.text.trim().isEmpty ? null : action.text.trim();
@@ -320,15 +322,36 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
       nextAction: next,
       events: [...changes, ...?old?.events],
     );
-    widget.repository.save(updated);
+    setState(() => saving = true);
+    try {
+      await widget.repository.save(updated);
+    } catch (e) {
+      if (mounted) {
+        setState(() => saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Save failed or this record changed. Your edits are still here. Return to Applications and refresh before retrying a conflict.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    saving = false;
     setState(() {
-      record = updated;
+      record = widget.repository.applications.firstWhere(
+        (a) => a.id == updated.id,
+      );
       editing = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Saved for this session. Refreshing resets the workspace.',
+          widget.repository.isDemo
+              ? 'Saved for this session. Refreshing resets the workspace.'
+              : 'Application saved locally.',
         ),
       ),
     );
@@ -374,7 +397,7 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const DemoNotice(),
+              if (widget.repository.isDemo) const DemoNotice(),
               const SizedBox(height: 24),
               if (editing)
                 Form(
@@ -481,8 +504,8 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                   ),
               ],
               const SizedBox(height: 32),
-              const Text(
-                'Session preview · Refreshing resets all changes.',
+              Text(
+                widget.repository.isDemo ? 'Session preview · Refreshing resets all changes.' : 'Application saved locally in PostgreSQL.',
                 style: TextStyle(color: muted),
               ),
             ],

@@ -5,9 +5,13 @@ import '../domain/application.dart';
 import 'app_theme.dart';
 import 'application_workspace.dart';
 import 'profile_screen.dart';
+import '../data/workspace_repository.dart';
+import 'workspace_screens.dart';
+import 'workspace_format.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.repository});
+  const AppShell({super.key, required this.repository, this.onLogout});
+  final VoidCallback? onLogout;
   final ApplicationRepository repository;
   @override
   State<AppShell> createState() => _AppShellState();
@@ -15,12 +19,15 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int selected = 0;
+  bool refreshing = false;
   static const titles = [
     'Overview',
     'Applications',
     'Activity',
     'Connections',
     'Profile',
+    'Review inbox',
+    'Actions',
   ];
   static const icons = [
     Icons.grid_view_rounded,
@@ -28,6 +35,8 @@ class _AppShellState extends State<AppShell> {
     Icons.history_rounded,
     Icons.hub_outlined,
     Icons.person_outline,
+    Icons.mark_email_unread_outlined,
+    Icons.checklist_outlined,
   ];
 
   @override
@@ -64,11 +73,12 @@ class _AppShellState extends State<AppShell> {
                           style: const TextStyle(color: muted, fontSize: 13),
                         ),
                       ),
-                      const BadgePill(
-                        'Personal workspace',
-                        Color(0xFFEBF1EC),
-                        ink,
-                      ),
+                      if (wide)
+                        const BadgePill(
+                          'Personal workspace',
+                          Color(0xFFEBF1EC),
+                          ink,
+                        ),
                     ],
                   ),
                 ),
@@ -86,10 +96,52 @@ class _AppShellState extends State<AppShell> {
                             if (widget.repository.isDemo && selected != 4)
                               const DemoNotice(),
                             const SizedBox(height: 28),
+                            if (widget.repository is WorkspaceRepository)
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: refreshing
+                                      ? null
+                                      : () async {
+                                          setState(() => refreshing = true);
+                                          try {
+                                            await (widget.repository
+                                                    as WorkspaceRepository)
+                                                .load();
+                                            if (mounted) setState(() {});
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Refresh failed. Check your connection or sign in again by reloading the page.',
+                                                      ),
+                                                    ),
+                                                  );
+                                            }
+                                          } finally {
+                                            if (mounted) {
+                                              setState(
+                                                () => refreshing = false,
+                                              );
+                                            }
+                                          }
+                                        },
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text(
+                                    refreshing
+                                        ? 'Refreshing…'
+                                        : 'Refresh workspace',
+                                  ),
+                                ),
+                              ),
                             ...page(context),
                             const SizedBox(height: 32),
-                            const Text(
-                              'Preview only · Changes are not saved',
+                            Text(
+                              widget.repository.isDemo
+                                  ? 'Application preview · Changes reset on refresh'
+                                  : 'Applications saved locally in PostgreSQL',
                               style: TextStyle(color: muted, fontSize: 12),
                             ),
                           ],
@@ -169,8 +221,21 @@ class _AppShellState extends State<AppShell> {
               if (isDrawer) Navigator.pop(context);
             },
             icon: const Icon(Icons.mail_outline, size: 18),
-            label: const Text('Gmail not connected'),
+            label: Text(
+              widget.repository is WorkspaceRepository &&
+                      (widget.repository as WorkspaceRepository)
+                              .connection['gmail_connected'] ==
+                          true
+                  ? 'Gmail authorized'
+                  : 'Gmail not connected',
+            ),
           ),
+          if (widget.onLogout != null)
+            TextButton.icon(
+              onPressed: widget.onLogout,
+              icon: const Icon(Icons.logout),
+              label: const Text('Sign out'),
+            ),
           const SizedBox(height: 20),
           const Text(
             'Local workspace',
@@ -184,6 +249,28 @@ class _AppShellState extends State<AppShell> {
   List<Widget> page(BuildContext context) {
     final apps = widget.repository.applications;
     switch (selected) {
+      case 5:
+        return [
+          widget.repository is WorkspaceRepository
+              ? ReviewScreen(
+                  repository: widget.repository as WorkspaceRepository,
+                  onChanged: () => setState(() {}),
+                )
+              : const Text(
+                  'Sign in to your saved workspace to review imported emails.',
+                ),
+        ];
+      case 6:
+        return [
+          widget.repository is WorkspaceRepository
+              ? ActionsScreen(
+                  repository: widget.repository as WorkspaceRepository,
+                  onChanged: () => setState(() {}),
+                )
+              : const Text(
+                  'Sign in to your saved workspace to manage dated actions.',
+                ),
+        ];
       case 4:
         return [const ProfileScreen()];
       case 1:
@@ -217,7 +304,7 @@ class _AppShellState extends State<AppShell> {
                     ),
                     title: Text(item.event.description),
                     subtitle: Text(
-                      '${item.app.company} · ${item.app.role}\n${item.event.date.month}/${item.event.date.day}/${item.event.date.year} · Sample event',
+                      '${item.app.company} · ${item.app.role}\n${manilaTime(item.event.date.toIso8601String())}${widget.repository.isDemo ? ' · Sample event' : ''}',
                     ),
                     isThreeLine: true,
                   ),
@@ -227,49 +314,25 @@ class _AppShellState extends State<AppShell> {
         ];
       case 3:
         return [
-          heading(
-            context,
-            'Connections',
-            'Manage email access and synchronization.',
-          ),
-          const SizedBox(height: 24),
-          const Surface(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.mark_email_unread_outlined, size: 36, color: teal),
-                SizedBox(height: 18),
-                Text(
-                  'Gmail',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          widget.repository is WorkspaceRepository
+              ? ConnectionScreen(
+                  repository: widget.repository as WorkspaceRepository,
+                  onChanged: () => setState(() {}),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    heading(
+                      context,
+                      'Connections',
+                      'Email access and local application storage.',
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Gmail not connected'),
+                    const Text('No emails have been read or labeled.'),
+                    const Text('Last synchronization: Never'),
+                  ],
                 ),
-                SizedBox(height: 12),
-                BadgePill(
-                  'Not connected',
-                  Color(0xFFFFF0D9),
-                  Color(0xFF8A5A12),
-                ),
-                SizedBox(height: 20),
-                Text('No emails have been read or labeled.'),
-                SizedBox(height: 8),
-                Text(
-                  'Synthetic workflows are available in n8n. Live Gmail authorization and synchronization are not connected to this app.',
-                  style: TextStyle(color: muted),
-                ),
-                SizedBox(height: 24),
-                Divider(),
-                SizedBox(height: 12),
-                Text(
-                  'Last synchronization: Never',
-                  style: TextStyle(color: muted),
-                ),
-                Text(
-                  'Storage: Browser session only; refresh resets changes',
-                  style: TextStyle(color: muted),
-                ),
-              ],
-            ),
-          ),
         ];
       default:
         final actions = apps.where((a) => a.nextAction != null).toList();
@@ -281,9 +344,27 @@ class _AppShellState extends State<AppShell> {
           ),
           const SizedBox(height: 26),
           Text(
-            '${apps.length} applications · ${actions.length} need a response',
+            '${apps.length} applications · ${actions.length} have next-action notes',
             style: const TextStyle(color: muted),
           ),
+          const SizedBox(height: 16),
+          if (widget.repository is WorkspaceRepository)
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: () => setState(() => selected = 5),
+                  child: Text(
+                    'Review ${(widget.repository as WorkspaceRepository).connection['review_count'] ?? 0} messages',
+                  ),
+                ),
+                OutlinedButton(
+                  onPressed: () => setState(() => selected = 6),
+                  child: const Text('View actions'),
+                ),
+              ],
+            ),
           const SizedBox(height: 28),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -293,7 +374,7 @@ class _AppShellState extends State<AppShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Needs your response',
+                      'Next-action notes',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -301,7 +382,7 @@ class _AppShellState extends State<AppShell> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'No deadlines specified in these examples.',
+                      'Manage due dates and completed tasks in Actions.',
                       style: TextStyle(fontSize: 12, color: muted),
                     ),
                     const SizedBox(height: 18),

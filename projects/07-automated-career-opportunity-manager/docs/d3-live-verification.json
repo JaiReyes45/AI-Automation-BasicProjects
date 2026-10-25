@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "last_node": "Confirm delivery",
+  "actions": {
+    "create": 2,
+    "unrecognized_message": 6,
+    "opportunity_only": 1,
+    "uncertain_language": 1
+  },
+  "Message IDs": 10,
+  "Store in CRM": 10,
+  "Confirm delivery": 10,
+  "real_submissions_readback_verified": 2
+}

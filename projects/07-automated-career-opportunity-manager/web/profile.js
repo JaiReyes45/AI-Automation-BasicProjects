@@ -12,4 +12,4 @@ window.careerUpload = function(category) {
  }catch(e){reject(e);}}; input.click();
  });
 };
-window.careerOpen = function(url) { const u=new URL(url,location.origin); if(u.protocol==='https:' || (u.origin===location.origin && u.pathname.startsWith('/api/files/'))) window.open(u.href,'_blank','noopener,noreferrer'); };
+window.careerOpen = function(url) { const u=new URL(url,location.origin); if((u.origin==='http://localhost:5678' && u.pathname==='/') || u.protocol==='https:' || (u.origin===location.origin && u.pathname.startsWith('/api/files/'))) window.open(u.href,'_blank','noopener,noreferrer'); };

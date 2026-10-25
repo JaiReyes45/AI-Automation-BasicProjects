@@ -7,7 +7,10 @@ services:
       dockerfile: docker/web.Dockerfile
     restart: unless-stopped
     depends_on:
-      - profile
+      profile:
+        condition: service_started
+      crm:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8087:80"
     healthcheck:
@@ -15,6 +18,24 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  crm:
+    build:
+      context: .
+      dockerfile: docker/crm.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CAREERFLOW_WORKFLOW_TOKEN: ${CAREERFLOW_WORKFLOW_TOKEN}
+      CAREERFLOW_APP_PASSWORD: ${CAREERFLOW_APP_PASSWORD:?Run scripts/setup_local.py}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8780/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   profile:
     build:
@@ -25,7 +46,6 @@ services:
       - ./local-data/profile:/data
 
   postgres:
-    profiles: [automation]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:

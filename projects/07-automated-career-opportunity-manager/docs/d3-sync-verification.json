@@ -1,0 +1,65 @@
+{
+  "labels": {
+    "checked_at": "2026-10-24T14:50:45.046711+00:00",
+    "status": "success",
+    "last_node": "Create label",
+    "counts": {
+      "Collect pages": 0,
+      "Message IDs": 0,
+      "Store in CRM": 0,
+      "Label jobs": 0,
+      "Record delivery": 0,
+      "Create label": 3
+    },
+    "actions": {}
+  },
+  "intake": {
+    "checked_at": "2026-10-24T14:55:46.400273+00:00",
+    "status": "success",
+    "last_node": "Sync complete",
+    "counts": {
+      "Recent career messages": 2,
+      "Collect pages": 1,
+      "Message IDs": 0,
+      "Store in CRM": 0,
+      "Label jobs": 0,
+      "Record delivery": 0,
+      "Create label": 0
+    },
+    "actions": {},
+    "matched_messages": 17
+  },
+  "reconcile": {
+    "checked_at": "2026-10-24T14:55:07.657992+00:00",
+    "status": "success",
+    "last_node": "Record delivery",
+    "counts": {
+      "Collect pages": 0,
+      "Message IDs": 0,
+      "Store in CRM": 0,
+      "Label jobs": 15,
+      "Record delivery": 15,
+      "Create label": 0
+    },
+    "actions": {},
+    "verified": 15
+  },
+  "previous_runs": [
+    {
+      "checked_at": "2026-10-24T14:55:17.445851+00:00",
+      "status": "success",
+      "last_node": "Sync complete",
+      "counts": {
+        "Collect pages": 1,
+        "Message IDs": 0,
+        "Store in CRM": 0,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0
+      },
+      "actions": {},
+      "matched_messages": 17,
+      "workflow": "intake"
+    }
+  ]
+}

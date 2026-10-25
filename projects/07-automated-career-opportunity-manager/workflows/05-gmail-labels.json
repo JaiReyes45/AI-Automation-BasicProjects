@@ -1,0 +1,146 @@
+{
+  "id": "project07GmailLabels",
+  "name": "Project 07 - 05 Prepare Gmail labels",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Execute manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Existing labels",
+      "name": "Existing labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Find missing",
+      "name": "Find missing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const required=[\"Career/Stage/submitted\", \"Career/Stage/reviewing\", \"Career/Stage/information\", \"Career/Stage/assessment\", \"Career/Stage/interview\", \"Career/Stage/offer\", \"Career/Stage/accepted\", \"Career/Stage/hired\", \"Career/Stage/rejected\", \"Career/Stage/withdrawn\", \"Career/Stage/closed\", \"Career/Stage/Opportunity Discovered\", \"Career/Role/IT Intern\", \"Career/Role/QA Engineer Intern\", \"Career/Role/Software Engineer Intern\", \"Career/Role/Business Application Intern\", \"Career/Role/Data Engineer Intern\", \"Career/Role/Other Internship\", \"Career/System/Needs Review\"];return required.filter(name=>!($json.labels||[]).some(l=>l.name===name)).map(name=>({json:{name}}));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Create label",
+      "name": "Create label",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({name:$json.name,labelListVisibility:\"labelShow\",messageListVisibility:\"show\"}) }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Existing labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existing labels": {
+      "main": [
+        [
+          {
+            "node": "Find missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find missing": {
+      "main": [
+        [
+          {
+            "node": "Create label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "executionTimeout": 240,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

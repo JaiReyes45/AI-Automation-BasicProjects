@@ -226,3 +226,9 @@ or next-day work was configured.
 ## October 23 D1.2 checkpoint
 
 D1.2 is complete for the session-only preview: application CRUD (add/edit), search, role/stage filters, details, event history, and independent next-action editing are verified. Nine tests pass; desktop/mobile browser checks and Docker web deployment passed. Day 1 UI scope is complete. Stop for review; D3.1 shared persistent storage is next.
+
+## October 25 autonomous release update
+
+The user authorized completion through client hand-off, including the originally planned Day 5 work. Milestone stops are superseded for this run; the tracker remains the status record. D4 review resolution, recovery controls and action tracking are implemented. The target is a local single-user Docker release, with reproducible setup and private backup verification.
+
+D5 implementation/release acceptance uses controlled full-pipeline checks plus verified live intake/label delivery. The original definition-of-done item requiring a genuine subsequent employer progression remains an explicit field-acceptance check, not silently marked passed. See HANDOFF.md and docs/release-verification.md for the final delivered boundary.

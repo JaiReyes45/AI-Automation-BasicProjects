@@ -1,0 +1,14 @@
+{
+  "checksums": "passed",
+  "isolated_postgres_restore": "passed",
+  "profile_integrity": "passed",
+  "counts": {
+    "applications": 3,
+    "messages": 104,
+    "events": 3,
+    "credentials": 2,
+    "workflows": 7,
+    "tasks": 0,
+    "audit": 0
+  }
+}

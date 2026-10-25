@@ -5,12 +5,13 @@ n8n, Python, and Docker.
 
 ## Status
 
-**Implemented locally; synthetic workflows and interactive UI verified.** Last reviewed: 2026-10-23.
+**Local client hand-off release 1.0.0.** Reviewed: 2026-10-25.
 
-12 Flutter tests and 20 engine tests pass. Profile storage checks cover saving,
-document delivery, validation and server-restart persistence. Four inactive n8n
-workflows are verified: three succeed and one deliberately fails on invalid input.
-Live Gmail and the shared application/workflow database remain pending.
+Application CRM, review decisions, dated actions, profile/document storage, scheduled
+Gmail intake and label recovery are implemented. Start with [HANDOFF.md](HANDOFF.md).
+The release has 20 passing Flutter tests and 35 engine/provider tests, API acceptance
+checks and a verified isolated backup restore. Genuine employer follow-up progression
+remains a field-acceptance item; controlled submission-to-hired progression passes.
 
 ## Business problem
 
@@ -26,16 +27,21 @@ inventing hiring probabilities.
 - Save profile details and internship requirements in a local Docker folder.
 - Upload/download PDF, DOCX, PNG and JPG files up to 8 MB; save external Drive links.
 - Classify controlled email fixtures, match applications, and prevent duplicates.
-- Demonstrate simulated label delivery, visible failures and bounded recovery.
+- Import recent career emails automatically; retain uncertain application matches for review.
+- Resolve uncertain emails by linking, creating, dismissing or saving an opportunity, with evidence and audit history.
+- Track dated actions, complete/reopen them, and keep hiring stages independent of task completion.
+- Verify Gmail stage/role labels by readback, with durable leases, bounded retries and visible recovery controls.
+- Back up the private local workspace and verify restoration into an isolated database.
 
-Application edits are session-only. Profile data and uploaded documents persist.
+Application edits now persist in PostgreSQL behind local workspace sign-in. Profile data and uploaded documents persist separately.
 Google Drive links do not connect an account or change sharing permissions.
 
 ## Implemented stack
 
 - Flutter web served by nginx on loopback port 8087.
 - Python profile service with SQLite metadata and local document files.
-- n8n 2.34.5 on loopback port 5678; PostgreSQL 16 stores n8n state.
+- n8n 2.34.5 on loopback port 5678; PostgreSQL 16 stores n8n state and the career schema.
+- Private Python CRM API with workspace sessions and revision checks.
 - Private Python synthetic workflow engine with persistent SQLite test storage.
 - Isolated Compose project: `project07-automated-career-opportunity-manager`.
 
@@ -49,9 +55,9 @@ See the [architecture diagram](diagrams/architecture.md).
 | `diagrams/` | Current architecture and integration boundaries |
 | `screenshots/` | Reviewed synthetic desktop/mobile UI evidence |
 | `lib/`, `web/`, `test/` | Flutter sources, web bridge and widget tests |
-| `profile_service/`, `workflow/` | Local profile API and synthetic classification engine |
+| `crm/`, `database/`, `profile_service/`, `workflow/` | Shared CRM API/schema, profile API and synthetic engine |
 | `fixtures/`, `tests/`, `scripts/` | Synthetic fixtures, regression tests and operator tools |
-| `workflows/` | Four inactive n8n exports with non-secret credential references |
+| `workflows/` | Seven portable, inactive exports; local workflows 06/07 are published |
 | `docker/` | Container build files and nginx configuration |
 
 ## Workflow map
@@ -62,6 +68,9 @@ See the [architecture diagram](diagrams/architecture.md).
 | 02 | Simulated label delivery |
 | 03 | Duplicate handling, interview progression and recovery scenario |
 | 04 | Expected invalid-input failure |
+| 05 | Prepare managed Gmail labels |
+| 06 | Five-minute Gmail intake, pagination and duplicate filtering |
+| 07 | Five-minute Gmail label reconciliation and readback |
 
 Exports contain synthetic examples, no execution data or secret values. Configure
 local credentials using the setup guide before running them.
@@ -91,11 +100,11 @@ Compose file and environment file, as documented. Recorded n8n results are in
 
 ## Known limitations
 
-- Application records reset on browser refresh; the shared database is D3.1.
-- Gmail OAuth, live ingestion and real label synchronization are not implemented.
-- Email classification supports controlled fixtures, not arbitrary employer templates.
+- Shared application persistence is verified; see [Day 3 integration](docs/d3-integration.md).
+- Gmail OAuth, pagination, intake and automatic label reconciliation are verified; a real matched follow-up advancing an application is still unverified.
+- Unknown provider layouts or ambiguous identities stay in review; the seven-day subject filter is not a complete mailbox backfill.
 - Profile storage is plain local storage, not encrypted storage or a backup.
-- No login layer: the app is for a trusted single-user device, not public hosting.
-- Document deletion/version management, manual-review UI, production backoff and
-  reconciliation remain future work. Uploaded documents are not parsed.
+- Local workspace sign-in is implemented; the app remains for a trusted single-user device, not public hosting.
+- Document deletion/version management and document parsing are outside this release. Review and retry controls are implemented.
+- Syncing requires Docker/n8n running; OAuth credentials can require reconnection. See [Day 3 operations](docs/d3-integration.md).
 - Local secrets, profile records, uploads, databases and generated builds are ignored.

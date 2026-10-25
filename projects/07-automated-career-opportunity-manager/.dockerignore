@@ -9,3 +9,8 @@
 
 !profile_service/
 !profile_service/**
+
+!crm/
+!crm/**
+!database/
+!database/**

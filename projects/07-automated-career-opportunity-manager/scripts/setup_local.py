@@ -19,3 +19,10 @@ else:
     with os.fdopen(descriptor, 'w') as stream:
         stream.write(data)
     print('Created private .env. Values were not printed.')
+
+# Add the workspace password without changing existing service/encryption keys.
+values = dict(line.split("=", 1) for line in target.read_text().splitlines() if "=" in line and not line.startswith("#"))
+if "CAREERFLOW_APP_PASSWORD" not in values:
+    with target.open("a") as stream:
+        stream.write("\nCAREERFLOW_APP_PASSWORD=" + secrets.token_urlsafe(24) + "\n")
+    print("Added private workspace password; read it locally from .env.")

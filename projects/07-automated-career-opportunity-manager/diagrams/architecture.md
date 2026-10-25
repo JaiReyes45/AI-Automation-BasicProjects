@@ -3,12 +3,27 @@
 ```mermaid
 flowchart LR
   Browser[Flutter web] --> Web[nginx localhost:8087]
-  Web --> Profile[Private profile service]
-  Profile --> Folder[Ignored local profile folder / SQLite and files]
-  User[Local operator] --> N8N[n8n localhost:5678]
-  N8N --> Postgres[PostgreSQL: n8n state]
-  N8N --> Engine[Private synthetic workflow engine]
-  Engine --> SQLite[Persistent synthetic SQLite store]
+  Web --> CRM[Private authenticated CRM API]
+  Web --> Profile[Private profile API]
+  Profile --> Folder[Local profile SQLite and documents]
+  CRM --> Postgres[PostgreSQL career and n8n schemas]
+  Operator[Local operator] --> N8N[n8n localhost:5678]
+  Schedule[Five-minute schedules] --> N8N
+  N8N --> Gmail[Gmail API]
+  N8N --> CRM
+  CRM --> Outbox[Durable label jobs]
+  Outbox --> Reconcile[n8n label verification and retries]
+  Reconcile --> Gmail
+  N8N --> Engine[Separate synthetic engine]
+  Engine --> SQLite[Synthetic SQLite store]
 ```
 
-Application editing remains in browser memory. The Flutter CRM is not yet connected to the workflow engine. Gmail OAuth and live labels remain pending. Profile files are stored separately from application data.
+Workflow 06 imports a bounded seven-day career-email window, follows pagination and skips duplicates. Workflow 07 separately delivers and verifies managed labels. Uncertain identity stays in review. Real application data is shared between Flutter and workflows through the CRM API. Profile uploads are separate; Drive links do not establish Google Drive account access.
+
+## Review, actions and durability
+
+Authenticated review decisions lock and version-check the message and application, record the decision and evidence, then queue the current managed labels. The HTTP response is sent only after commit. A label worker acknowledges delivery only after Gmail readback with the matching generation and lease.
+
+Actions are separate persisted records with optional Manila due dates and revision checks. Completion adds history without changing an application stage. The Connections screen reads completion timestamps, published-workflow state and delivery failures from the same API.
+
+Private backups capture PostgreSQL, the profile SQLite/file folder, n8n state, synthetic engine data and the original environment keys while writers are stopped. Isolated restore verification compares counts and checks document integrity. Public release artifacts contain only source, built client assets and sanitized evidence.

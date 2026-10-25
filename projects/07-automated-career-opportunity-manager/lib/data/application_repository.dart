@@ -1,10 +1,10 @@
 import '../domain/application.dart';
 
-/// Session-only preview repository; durable storage follows in D3.1.
+/// Shared application interface; DemoApplicationRepository is for previews only.
 abstract class ApplicationRepository {
   List<JobApplication> get applications;
   bool get isDemo;
-  void save(JobApplication application);
+  Future<void> save(JobApplication application);
 }
 
 class DemoApplicationRepository implements ApplicationRepository {
@@ -14,7 +14,7 @@ class DemoApplicationRepository implements ApplicationRepository {
   List<JobApplication> get applications => List.unmodifiable(_applications);
 
   @override
-  void save(JobApplication application) {
+  Future<void> save(JobApplication application) async {
     final index = _applications.indexWhere((a) => a.id == application.id);
     if (index < 0) {
       _applications.insert(0, application);

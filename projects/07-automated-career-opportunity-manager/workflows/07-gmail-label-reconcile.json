@@ -1,0 +1,492 @@
+{
+  "id": "project07GmailReconcile",
+  "name": "Project 07 - 07 Verify and retry Gmail labels",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Execute manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Gmail account",
+      "name": "Gmail account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "List Gmail labels",
+      "name": "List Gmail labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Claim pending labels",
+      "name": "Claim pending labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/label-claim",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({account:$('Gmail account').first().json.emailAddress}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Label jobs",
+      "name": "Label jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return ($json.jobs||[]).map(job=>({json:job}));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Resolve label IDs",
+      "name": "Resolve label IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const all=$('List Gmail labels').first().json.labels||[];const plan=$json;\nconst add=plan.labels.map(name=>all.find(l=>l.name===name)?.id);\nconst remove=all.filter(l=>l.name.startsWith('Career/Stage/')||l.name.startsWith('Career/Role/')||l.name==='Career/System/Needs Review').map(l=>l.id).filter(id=>!add.includes(id));\nreturn {json:{...plan,addLabelIds:add,removeLabelIds:remove,ready:add.every(Boolean)}};",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "Labels exist",
+      "name": "Labels exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ready }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "Apply Gmail labels",
+      "name": "Apply Gmail labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "url": "={{ \"https://gmail.googleapis.com/gmail/v1/users/me/messages/\"+encodeURIComponent($json.message_id)+\"/modify\" }}",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({addLabelIds:$json.addLabelIds,removeLabelIds:$json.removeLabelIds}) }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Read back labels",
+      "name": "Read back labels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "url": "={{ \"https://gmail.googleapis.com/gmail/v1/users/me/messages/\"+encodeURIComponent($(\"Resolve label IDs\").item.json.message_id)+\"?format=minimal&fields=id,labelIds\" }}",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Verify delivery",
+      "name": "Verify delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const plan=$('Resolve label IDs').item.json;\nconst labels=$json.body?.labelIds||[];const status=$json.statusCode||0;\nconst verified=status===200&&plan.addLabelIds.every(id=>labels.includes(id))&&plan.removeLabelIds.every(id=>!labels.includes(id));\nreturn {json:{job_id:plan.job_id,generation:plan.generation,attempt:plan.attempt,verified,\nerror:status===404?'not_found':status===401||status===403?'authorization':status===200?'label_readback_mismatch':'provider_error'}};",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "Record delivery",
+      "name": "Record delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/label-result",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Missing label result",
+      "name": "Missing label result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return {json:{job_id:$json.job_id,generation:$json.generation,attempt:$json.attempt,verified:false,error:'missing_label'}};",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "Every five minutes",
+      "name": "Every five minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail account": {
+      "main": [
+        [
+          {
+            "node": "List Gmail labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Gmail labels": {
+      "main": [
+        [
+          {
+            "node": "Claim pending labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim pending labels": {
+      "main": [
+        [
+          {
+            "node": "Label jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label jobs": {
+      "main": [
+        [
+          {
+            "node": "Resolve label IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve label IDs": {
+      "main": [
+        [
+          {
+            "node": "Labels exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Labels exist": {
+      "main": [
+        [
+          {
+            "node": "Apply Gmail labels",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Missing label result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Gmail labels": {
+      "main": [
+        [
+          {
+            "node": "Read back labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read back labels": {
+      "main": [
+        [
+          {
+            "node": "Verify delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify delivery": {
+      "main": [
+        [
+          {
+            "node": "Record delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record delivery": {
+      "main": []
+    },
+    "Missing label result": {
+      "main": [
+        [
+          {
+            "node": "Record delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every five minutes": {
+      "main": [
+        [
+          {
+            "node": "Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "executionTimeout": 240,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

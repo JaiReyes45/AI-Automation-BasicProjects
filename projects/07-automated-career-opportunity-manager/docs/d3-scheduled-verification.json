@@ -1,0 +1,53 @@
+{
+  "last_checked": "2026-10-25T07:55:47.592766+00:00",
+  "last_sync_completed": "2026-10-25T07:55:49.112206+00:00",
+  "last_sync_processed": 0,
+  "last_label_check": "2026-10-25T07:55:09.934966+00:00",
+  "checked_at": "2026-10-25T07:58:19.251700+00:00",
+  "applications": 3,
+  "eligible_jobs": {
+    "delivered": 17
+  },
+  "legacy_excluded": 87,
+  "review_messages": 11,
+  "workflows": [
+    {
+      "id": "project07GmailReconcile",
+      "active": true
+    },
+    {
+      "id": "project07GmailSync",
+      "active": true
+    }
+  ],
+  "scheduled_executions": [
+    {
+      "workflow": "project07GmailSync",
+      "status": "not_retained",
+      "mode": "trigger",
+      "started": "2026-10-25 15:55:47.020000+08:00",
+      "payload_retained": false
+    },
+    {
+      "workflow": "project07GmailReconcile",
+      "status": "not_retained",
+      "mode": "trigger",
+      "started": "2026-10-25 15:55:09.028000+08:00",
+      "payload_retained": false
+    },
+    {
+      "workflow": "project07GmailSync",
+      "status": "not_retained",
+      "mode": "trigger",
+      "started": "2026-10-25 15:50:47.024000+08:00",
+      "payload_retained": false
+    },
+    {
+      "workflow": "project07GmailReconcile",
+      "status": "not_retained",
+      "mode": "trigger",
+      "started": "2026-10-25 15:50:09.050000+08:00",
+      "payload_retained": false
+    }
+  ]
+}

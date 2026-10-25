@@ -1,16 +1,16 @@
 # CareerFlow â€” progress tracker
 
-Last updated: October 23, 2026 (Asia/Manila).
+Last updated: October 25, 2026 (Asia/Manila).
 
 ## Current checkpoint
 
 - **Completed:** D1.1, D1.2 interactive session preview, UI refinement, local Docker deployment, D2.1 classification/matching, and D2.2 orchestration for synthetic data.
-- **Current status:** D1.2 is complete and deployed locally. Stopped at the milestone for review.
-- **Next:** D3.1 shared application database and frontend integration; stopped after D1.2 for review.
-- **Gmail connection:** Not configured. Live ingestion and label updates are blocked on D3.2 OAuth/provider integration; no mailbox changes made.
+- **Current status:** D4.1/D4.2 and D5.1/D5.2 complete for local hand-off release 1.0.0. D3.2 genuine follow-up field acceptance remains open.
+- **Next:** Use the review inbox for ambiguous emails; observe the next safely matched genuine employer follow-up. No additional infrastructure is required for the delivered local scope.
+- **Gmail connection:** OAuth connected. Five-minute intake and label reconciliation are published and automatically verified; 17 messages checked, 3 confirmed applications, 11 review items.
 - **Local URLs:** Web http://localhost:8087; n8n http://localhost:5678.
-- **Runtime:** web, n8n, PostgreSQL, and private engine under project07-automated-career-opportunity-manager.
-- **Database distinction:** PostgreSQL stores n8n state. The engine uses persistent SQLite only for this synthetic sprint; Flutter still shows fictional preview data.
+- **Runtime:** web, CRM, profile, n8n, PostgreSQL, and private engine under project07-automated-career-opportunity-manager.
+- **Database distinction:** PostgreSQL now stores the career schema and n8n state. Existing synthetic SQLite and local profile files remain separate and intact.
 
 ## Milestone board
 
@@ -21,12 +21,12 @@ Last updated: October 23, 2026 (Asia/Manila).
 | Oct 23 | D1.2 - Interactive CRM screens | Complete (session preview) | 9 tests pass; clean analysis; release build, desktop/mobile browser checks and Docker deployment verified |
 | Oct 23 | D2.1 â€” Email classification and matching | Complete (synthetic scope) | 20 regression tests pass, including a 16-case email fixture matrix; live templates unverified |
 | Oct 23 | D2.2 â€” Workflow orchestration | Complete (synthetic scope); live checks blocked | Four installed workflows verified: three successful and one expected failure; real Gmail awaits D3.2 |
-| Oct 24 | D3.1 â€” Database and app integration | Not started | Backend project and access configuration needed |
-| Oct 24 | D3.2 â€” Gmail and label synchronization | Not started | Google OAuth connection and live verification needed |
-| Oct 25 | D4.1 â€” Recovery and manual review | Not started | Depends on integrated application flow |
-| Oct 25 | D4.2 â€” Action tracking | Not started | Depends on persisted tasks/events |
-| Oct 26 | D5.1 â€” End-to-end verification | Not started | Depends on completed feature milestones |
-| Oct 26 | D5.2 â€” Release and handover | Not started | Hosting scope and release checks needed |
+| Oct 24 | D3.1 - Database and app integration | Complete (local single-user scope) | Authenticated PostgreSQL repository; workflow/API, browser reload and container-restart persistence verified |
+| Oct 24 | D3.2 - Gmail and labels | Scheduled-sync milestone complete; real progression acceptance open | Two-page intake, 17 verified label deliveries, automatic triggers, deduplication and bounded recovery pass; genuine matched employer progression still unverified |
+| Oct 25 | D4.1 â€” Recovery and manual review | Complete | Review decisions, evidence/audit, conflict protection and delivery retry; API and widget checks pass |
+| Oct 25 | D4.2 â€” Action tracking | Complete | Dated actions, complete/reopen, optional deadlines and independent application stages verified |
+| Oct 26 | D5.1 â€” End-to-end verification | Complete for controlled/local release scope | 20 Flutter tests, 35 parser tests, API/profile suites, desktop/mobile browser and isolated restore pass; genuine follow-up field acceptance remains open |
+| Oct 26 | D5.2 â€” Release and handover | Complete for local scope | Docker deployment, hand-off kit, setup/user/recovery guides, checksum verification and isolated restore verified |
 
 ## Verified facts
 
@@ -47,7 +47,7 @@ Last updated: October 23, 2026 (Asia/Manila).
 | Flutter as the application framework | Confirmed by user |
 | Web as the first platform | Confirmed by user |
 | Daily sprints, website today and workflow tomorrow | Confirmed by user |
-| Update tracker and stop at every completed milestone | Confirmed by user |
+| Update tracker at every milestone; continue autonomously through hand-off | Updated by user October 25 |
 | Supabase/PostgreSQL and n8n integration | Planned architecture; configuration pending |
 
 ## Checkpoint log
@@ -179,3 +179,70 @@ Do not mark a milestone complete based only on generated code or elapsed time.
 - User authorized committing and pushing, matching the preceding portfolio projects.
 - Kept the numbered project folder; separated screenshots and diagrams; aligned README status, problem, behavior, stack, layout, workflow map, setup, validation and limitations.
 - Reviewed publishable files and excluded local secrets/data/builds. Prior no-push entries describe earlier checkpoints.
+
+
+### October 24 - D3.1 integration checkpoint
+
+- Implemented PostgreSQL career schema, authenticated browser/session API, internal workflow API, persistent Flutter repository, manual event history and revision-conflict checks.
+- 12 widget tests passed, clean analysis, release build passed. Docker integration verified auth denial, duplicate handling, shared records, stage/history, persisted actions and conflict rejection. Container-restart persistence verified with a temporary synthetic record.
+- D3.2 now in live verification after user authorized recent career emails from the last seven days and connected Gmail OAuth successfully.
+- No Gmail or profile content is committed. See docs/d3-integration.md.
+
+### October 24 - Live pilot checkpoint
+
+- Real JobStreet submission created in the shared CRM. Gmail stage/role labels verified by readback; resolved review label cleared.
+- Focused run: 10 processed and acknowledged, 2 application results, 1 opportunity, 7 review results. Earlier broader run hit a 403 and its unacknowledged jobs remain visible in storage.
+- Added sanitized JobStreet/alert regression tests: 22 engine/provider tests pass; 12 Flutter widget tests pass.
+- Browser-created synthetic application survived reload and was removed after verification. Existing user data and uploads preserved.
+- D3.1 complete. D3.2 remains open for a real subsequent employer progression and broader provider validation. Polling is off. No new GitHub push.
+
+
+### October 24 - D3.2 recognition and matching milestone
+
+- Expanded verified JobStreet internship titles and confirmation identity; added conservative Indeed/Workday recognition, shortlist/assessment/rejection patterns, and listing-expiry protection.
+- Fixed multiple company/role confirmations sharing one Gmail thread without merging applications. Ambiguous follow-ups still go to review.
+- 35 engine/provider tests pass. Recovered one additional real confirmation: three application records in total.
+
+### October 24 - D3.2 recovery and automatic-sync milestone
+
+- Workflow 06 follows Gmail page tokens (10/page, cap 200), filters previously processed messages and imports oldest first. Live check followed two pages containing 17 matches; repeat intake imported zero messages.
+- Workflow 07 persists leases, retries with backoff, caps attempts, verifies Gmail labels by readback and rejects stale acknowledgements. PostgreSQL integration checks passed using rolled-back synthetic records.
+- 17 eligible label jobs delivered; zero eligible pending/failed jobs. 87 earlier broad-query jobs remain stored but excluded from automatic labeling. Eleven messages require review; three are opportunity alerts.
+- Published only workflows 06 and 07 at five-minute intervals. Automatic trigger execution reached the CRM completion endpoint at 23:00 Manila and the label queue check at 23:00; timestamps and counts are in docs/d3-scheduled-verification.json.
+- n8n discards execution payloads by design. Its soft-deleted database rows retain an obsolete running value; the status script reports these as not_retained and uses CRM completion timestamps as evidence, not the discarded row status.
+- Website API sign-in passed with the user's configured password and returned three persisted applications. Profile files, credentials and other Docker stacks preserved.
+- Full D3.2 real-world progression acceptance remains open because no genuine follow-up could be safely matched to advance a record. Synthetic interview progression passed. No forced matches or fabricated records.
+- Updated README, architecture, operations and verification evidence. No Flutter changes or new GitHub push. Stop at this milestone; D4 review-resolution controls are next.
+
+
+### October 25 - D4 API checkpoint
+
+- User authorized autonomous completion through the local client hand-off, superseding milestone stops for this run. Continue to update and report each milestone.
+- Implemented authenticated review decisions (create/link/dismiss/opportunity), evidence, audit records, revision conflicts, and protection against stale or closed-stage changes.
+- Implemented dated tasks, completion/reopening, and label-retry controls. Task completion never changes the hiring stage.
+- API checks passed for a controlled submission-to-hired sequence, repeat resolution, stale application revisions, task validation, recovery and logout. Temporary synthetic records were removed.
+- A private pre-release backup restored into an isolated database with matching row counts and profile integrity. See docs/backup-verification.json. No user database or volume was replaced.
+- Review/action/connection widget tests pass at 375, 768 and 1440 widths plus landscape. Full-suite, large-text, deployed-browser and release verification remain in progress.
+
+### October 25 - D4 feature milestone complete
+
+- Review inbox, action tracking and live connection/recovery screens deployed to Docker.
+- All 20 Flutter tests pass, including 375/768/1440 widths, landscape, enlarged text and reduced motion. Analysis is clean and production web build succeeded.
+- All 35 parser/engine regressions, three CRM integration suites and profile upload/restart checks pass.
+- At 15:55 Manila, both scheduled workers completed; 3 real applications, 11 review items and 17 delivered eligible label jobs remain intact. No real review decision was changed by testing.
+- D4.1 and D4.2 complete. D5 browser verification, final backup and hand-off package continue under the user's autonomous-completion instruction.
+
+### October 25 - D5.1 verification milestone complete
+
+- Deployed-browser task creation, dated save, completion and reopening passed; API readback confirmed the hiring stage did not change. Removed the synthetic browser application/task/history/audit afterward.
+- Desktop review and mobile connection/review screens visually inspected. Narrow-screen navigation and review decision controls are available; real decisions remained unchanged.
+- Final clean backup restored into an isolated database: 3 applications, 104 messages, 3 events, 2 encrypted credentials, 7 workflows, no synthetic task/audit rows. Checksums and profile integrity passed.
+- D5.1 local/controlled acceptance complete. Genuine employer follow-up progression remains a separately documented field check.
+
+### October 25 - D5.2 local hand-off milestone complete
+
+- Prepared release 1.0.0 with source, built web assets, HANDOFF.md, daily-use, installation, recovery and verification guides. The ZIP excludes local secrets, emails, profile data and backups; includes per-file SHA-256 manifest and archive checksum.
+- Validated the extracted installation kit's generated settings, all-service Compose configuration and bundled web assets in a temporary directory. This does not claim a second-device OAuth connection or full migration was performed.
+- Browser sign-out returned 401 for both CRM and profile routes; QA browser closed. Final clean backup verified and live services resumed.
+- Public workflow exports remain inactive with credential references only; runtime workflows 06/07 remain published. Real application and review records are preserved.
+- Local client hand-off scope complete. Original genuine follow-up acceptance remains open; no synthetic result is presented as a real employer progression. Future scope is listed in HANDOFF.md.

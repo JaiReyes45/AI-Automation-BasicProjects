@@ -1,0 +1,553 @@
+{
+  "id": "project07GmailSync",
+  "name": "Project 07 - 06 Gmail to persistent CRM",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Execute manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "Gmail account",
+      "name": "Gmail account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Record connection",
+      "name": "Record connection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/connection",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({account:$json.emailAddress}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Recent career messages",
+      "name": "Recent career messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=newer_than%3A7d%20%7Bsubject%3Aapplication%20subject%3Ainterview%20subject%3Ainternship%20subject%3Aassessment%20subject%3A%22thank%20you%20for%20applying%22%20subject%3Ashortlisted%20subject%3A%22job%20offer%22%20subject%3A%22additional%20information%22%7D%20-category%3Apromotions%20-in%3Asent%20-in%3Adrafts%20-from%3Ajobalert.indeed.com%20-subject%3A%22job%20alert%22%20-subject%3A%22jobs%20you%20may%22",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken || \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 20,
+              "requestInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Collect pages",
+      "name": "Collect pages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const pages=$input.all();if(pages.at(-1).json.nextPageToken)throw new Error('Seven-day search exceeded 200 messages; narrow query before retry.');\nconst ids=new Map();for(const p of pages)for(const m of p.json.messages||[])ids.set(m.id,m);\nreturn [{json:{account:$('Gmail account').first().json.emailAddress,messages:[...ids.values()]}}];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Select unprocessed",
+      "name": "Select unprocessed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/select-messages",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Has messages",
+      "name": "Has messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.messages.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "Message IDs",
+      "name": "Message IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return $json.messages.map(m=>({json:m}));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Read message",
+      "name": "Read message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "url": "={{ \"https://gmail.googleapis.com/gmail/v1/users/me/messages/\"+encodeURIComponent($json.id)+\"?format=full\" }}",
+        "options": {
+          "timeout": 20000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 750
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Normalize email",
+      "name": "Normalize email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const m=$json;const parts=[];\nfunction visit(p,type){if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}\nvisit(m.payload,'text/plain');if(!parts.length)visit(m.payload,'text/html');\nconst headers=m.payload.headers||[];const header=n=>headers.find(h=>h.name.toLowerCase()===n)?.value||'';\nreturn {json:{account:$('Gmail account').first().json.emailAddress,id:m.id,thread_id:m.threadId,\nreceived_at:new Date(Number(m.internalDate)).toISOString(),body:(parts.join('\\n')||'[No text body]').slice(0,75000),\nsubject:header('subject'),sender:header('from')}};",
+        "mode": "runOnceForEachItem"
+      }
+    },
+    {
+      "id": "Oldest first",
+      "name": "Oldest first",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map((item,index)=>({json:item.json,pairedItem:{item:index}})).sort((a,b)=>a.json.received_at.localeCompare(b.json.received_at));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Store in CRM",
+      "name": "Store in CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/gmail-ingest",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Count imported",
+      "name": "Count imported",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "return [{json:{processed:$input.all().length}}];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Sync complete",
+      "name": "Sync complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/internal/sync-complete",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({processed:$json.processed||0}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Every five minutes",
+      "name": "Every five minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail account": {
+      "main": [
+        [
+          {
+            "node": "Record connection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record connection": {
+      "main": [
+        [
+          {
+            "node": "Recent career messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recent career messages": {
+      "main": [
+        [
+          {
+            "node": "Collect pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect pages": {
+      "main": [
+        [
+          {
+            "node": "Select unprocessed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select unprocessed": {
+      "main": [
+        [
+          {
+            "node": "Has messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has messages": {
+      "main": [
+        [
+          {
+            "node": "Message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sync complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message IDs": {
+      "main": [
+        [
+          {
+            "node": "Read message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read message": {
+      "main": [
+        [
+          {
+            "node": "Normalize email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize email": {
+      "main": [
+        [
+          {
+            "node": "Oldest first",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Oldest first": {
+      "main": [
+        [
+          {
+            "node": "Store in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in CRM": {
+      "main": [
+        [
+          {
+            "node": "Count imported",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count imported": {
+      "main": [
+        [
+          {
+            "node": "Sync complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every five minutes": {
+      "main": [
+        [
+          {
+            "node": "Gmail account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "executionTimeout": 240,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}
