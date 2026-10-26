@@ -13,6 +13,7 @@ flutter pub get
 flutter analyze
 flutter test
 flutter build web --no-web-resources-cdn --no-wasm-dry-run
+python3 scripts/finalize_web.py
 ```
 
 Return to the repository root:
@@ -34,17 +35,17 @@ python3 projects/07-automated-career-opportunity-manager/scripts/import_n8n.py
 python3 projects/07-automated-career-opportunity-manager/scripts/verify_n8n.py
 ```
 
-The importer imports seven workflows and the local service-header credential via a temporary private file, then removes that file. Reimporting replaces matching workflow IDs; export intentional editor changes first. Workflows 01–04 are synthetic checks, including an expected invalid-input failure in 04.
+The importer imports nine workflows and the local service-header credential via a temporary private file, then removes that file. Reimporting replaces matching workflow IDs; export intentional editor changes first. Workflows 01–04 are synthetic checks, including an expected invalid-input failure in 04.
 
 Create a Google Cloud Web OAuth client with Gmail API enabled. Configure an External testing audience and add your Gmail address as a test user. Set the redirect URI to `http://localhost:5678/rest/oauth2-credential/callback`. Enter the client details only in an n8n Gmail OAuth2 credential and connect your account. An Internal audience blocks personal Gmail accounts with `org_internal`.
 
 In every Gmail credential selector in workflows 05, 06 and 07, select your new credential; the exported ID belongs to the original local installation and will not exist in a fresh one. Keep the existing local engine-header credential on internal CRM requests. Save the workflows. Run 05 once to prepare managed labels, then manually test 06 (intake) and 07 (delivery). Inspect Connections and your Gmail labels before publishing.
 
-Publish **06 and 07 only**, using their five-minute schedules. A fresh installation is not connected until this OAuth and workflow setup is complete. Google testing grants may require reconnection. See [Day 3 integration](d3-integration.md) for identity and delivery details.
+For Gmail intake/labels, publish **06 and 07**, using their five-minute schedules. A fresh installation is not connected until this OAuth and workflow setup is complete. Google testing grants may require reconnection. See [Day 3 integration](d3-integration.md) for identity and delivery details.
 
 ## Normal operation
 
-Docker and an awake device are required. Intake searches the last seven days of focused career subjects, follows pages up to 200 messages, and fails explicitly if that cap is exceeded. No mail is sent, deleted, archived or marked read. Only managed Career labels are changed. The exports stay inactive for portability; the original installation has 06/07 published.
+Docker and an awake device are required. Intake searches the last seven days of focused career subjects, follows pages up to 200 messages, and fails explicitly if that cap is exceeded. Intake and label workers do not send, delete, archive or mark mail read. Only managed Career labels are changed by those workers. Explicitly confirmed replies use the separate worker 08. The exports stay inactive for portability; the original installation has 06/07/08/09 published.
 
 ```bash
 docker compose --env-file projects/07-automated-career-opportunity-manager/.env -f projects/07-automated-career-opportunity-manager/compose.yaml --profile automation ps
@@ -79,3 +80,7 @@ A container restart alone does not reload changed environment values. Existing s
 If the web proxy returns 502 after recreating backend containers, restart this project's web service to refresh its internal DNS resolution. Check Docker health before retrying sign-in. For expired OAuth, reconnect the Gmail credential in n8n and verify the next completion timestamp; repeated label retries cannot repair a broken grant.
 
 See [backup and recovery](backup-recovery.md) before moving data. This release is bound to loopback for a trusted personal device; it is not configured for public hosting.
+
+## Workspace 1.1 extensions
+
+See [Calendar and local assistant setup](workspace-1.1.md). Workflows 08/09 require their Gmail/Calendar credential selectors to be configured before publication. Start the optional `assistant` Compose profile and download Qwen3 4B for local chat. Use `--profile automation --profile assistant stop` to stop all CareerFlow services without deleting volumes. The assistant profile requests the device's NVIDIA GPU.

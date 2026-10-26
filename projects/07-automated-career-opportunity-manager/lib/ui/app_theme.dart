@@ -14,22 +14,24 @@ ThemeData careerTheme() => ThemeData(
     filled: true,
     fillColor: Colors.white,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(14),
       borderSide: const BorderSide(color: Color(0xFF868F88)),
     ),
   ),
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
       minimumSize: const Size(48, 48),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 3,
+      shadowColor: const Color(0xFF193F35),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
       minimumSize: const Size(48, 48),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
   ),
   appBarTheme: const AppBarTheme(
@@ -40,13 +42,13 @@ ThemeData careerTheme() => ThemeData(
   textTheme: const TextTheme(
     headlineLarge: TextStyle(
       fontSize: 30,
-      fontWeight: FontWeight.w700,
+      fontWeight: FontWeight.w800,
       color: ink,
       letterSpacing: -0.5,
     ),
     titleLarge: TextStyle(
       fontSize: 20,
-      fontWeight: FontWeight.w700,
+      fontWeight: FontWeight.w800,
       color: ink,
     ),
     titleMedium: TextStyle(

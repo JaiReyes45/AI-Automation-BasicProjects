@@ -30,6 +30,8 @@ class JobApplication {
     required this.stage,
     required List<ApplicationEvent> events,
     this.nextAction,
+    this.submittedOn,
+    this.jobDescription = '',
   }) : events = List.unmodifiable(events);
   final String id;
   final String company;
@@ -37,5 +39,7 @@ class JobApplication {
   final String source;
   final HiringStage stage;
   final String? nextAction;
+  final String? submittedOn;
+  final String jobDescription;
   final List<ApplicationEvent> events;
 }

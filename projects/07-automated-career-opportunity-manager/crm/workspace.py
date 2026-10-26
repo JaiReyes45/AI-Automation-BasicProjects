@@ -155,3 +155,23 @@ def retry_delivery(db, body):
     db.execute("UPDATE career.label_jobs SET state='pending',generation=generation+1,attempts=0,next_attempt=0,error=NULL WHERE id=%s",(body['id'],))
     audit(db,'label_retry',dict(job_id=body['id']))
     return {'ok':True}
+
+
+def application_emails(db, application_id):
+    import re
+    from html import unescape
+    from email.utils import parseaddr
+    if not db.execute('SELECT 1 FROM career.applications WHERE id=%s',(application_id,)).fetchone():
+        raise ValueError('Application not found')
+    rows=db.execute("SELECT envelope FROM career.messages WHERE result->>'application_id'=%s ORDER BY (envelope->>'received_at')::timestamptz DESC",(application_id,)).fetchall()
+    items=[]
+    for m, in rows:
+        body=m.get('html_text') or m['body']
+        # Display text only, retaining quoted content. Never render active mail HTML.
+        body=re.sub(r'<(?:script|style)\b[^>]*>.*?</(?:script|style)>','',body,flags=re.I|re.S)
+        body=unescape(re.sub(r'<[^>]+>','',body))
+        sender=parseaddr(m.get('reply_to') or m.get('sender',''))[1]
+        items.append(dict(id=m['id'],account=m['account'],thread_id=m.get('thread_id'),
+            subject=m.get('subject','No subject'),sender=m.get('sender',''),reply_to=sender,
+            received_at=m['received_at'],body=body,has_more=len(m['body'])>=45000 or len(m.get('html_text',''))>=20000))
+    return {'items':items}

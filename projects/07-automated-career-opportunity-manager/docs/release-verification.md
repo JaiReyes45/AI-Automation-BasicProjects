@@ -40,3 +40,7 @@ Sign-out returned 401 from both CRM and profile routes. The extracted release ki
 - The live view refreshes every 30 seconds and on tab resume. Requests do not overlap; in-flight refresh results cannot replace data while an editor is open. Profile/edit views pause automatic refresh; errors remain visible until recovery.
 
 Deployed browser verification: five application records rendered. Two background refresh batches approximately thirty seconds apart returned HTTP 200 for applications, status, review, tasks and deliveries without clicking Refresh. This confirms the served production build performs automatic refresh.
+
+## Release 1.1.0 — October 26
+
+See [workspace verification](workspace-1.1-verification.md) for date/search/email, profile/photo, rounded journey UI, Calendar and local assistant checks. Final isolated restore verified five applications, 106 messages, 56 calendar events, nine workflows and three encrypted credentials; no synthetic action/audit rows remain. No live test reply or meeting invitation was sent.

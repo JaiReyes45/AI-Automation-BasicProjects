@@ -6,18 +6,22 @@ import os
 import re
 import sqlite3
 import uuid
+import io
+from PIL import Image, ImageOps, UnidentifiedImageError
+Image.MAX_IMAGE_PIXELS = 16_000_000
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 ROOT = Path(os.environ.get('PROFILE_DATA', '/data'))
-FIELDS = {'name','email','phone','location','school','course','year','hours','availability','linkedin','github','portfolio','drive','notes'}
+FIELDS = {'name','email','phone','location','school','course','year','hours','availability','linkedin','github','portfolio','drive','notes','headline'}
 
 @contextmanager
 def connect():
     ROOT.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(ROOT / 'profile.sqlite')
     db.execute('CREATE TABLE IF NOT EXISTS profile (id INTEGER PRIMARY KEY, body TEXT)')
+    db.execute('CREATE TABLE IF NOT EXISTS avatar (id INTEGER PRIMARY KEY, image BLOB, version TEXT)')
     db.execute('CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, body TEXT)')
     try:
         with db:
@@ -36,9 +40,13 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
     def do_GET(self):
         with connect() as db:
+            if urlparse(self.path).path == '/api/avatar':
+                row=db.execute('SELECT image FROM avatar WHERE id=1').fetchone()
+                if not row:return self.respond(404,{'error':'No photo'})
+                self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.end_headers();self.wfile.write(row[0]);return
             if self.path == '/api/profile':
                 row = db.execute('SELECT body FROM profile WHERE id=1').fetchone()
-                return self.respond(200, {'profile':json.loads(row[0]) if row else {}, 'documents':[json.loads(r[0]) for r in db.execute('SELECT body FROM documents ORDER BY rowid DESC')]})
+                return self.respond(200, {'profile':json.loads(row[0]) if row else {}, 'avatar_url':('/api/avatar?v='+db.execute('SELECT version FROM avatar WHERE id=1').fetchone()[0]) if db.execute('SELECT 1 FROM avatar WHERE id=1').fetchone() else None, 'documents':[json.loads(r[0]) for r in db.execute('SELECT body FROM documents ORDER BY rowid DESC')]})
             if re.fullmatch(r'/api/files/[a-f0-9]{32}', self.path):
                 key = self.path.rsplit('/',1)[1]
                 row = db.execute('SELECT body FROM documents WHERE id=?',(key,)).fetchone()
@@ -68,6 +76,16 @@ class Handler(BaseHTTPRequestHandler):
                         if not isinstance(v,str) or len(v)>3000: raise ValueError('Invalid field length')
                         if k in {'linkedin','github','portfolio','drive'} and v and (urlparse(v).scheme != 'https' or not urlparse(v).netloc): raise ValueError('Links must use https://')
                     db.execute('INSERT OR REPLACE INTO profile VALUES (1,?)',(json.dumps(data),))
+                elif self.path == '/api/avatar':
+                    content=base64.b64decode(data.get('content',''),validate=True)
+                    if not 0 < len(content) <= 4*1024*1024:raise ValueError('Photo must be under 4 MB')
+                    with Image.open(io.BytesIO(content)) as picture:
+                        if picture.format not in ('PNG','JPEG'):raise ValueError('Use PNG or JPG')
+                        if picture.width*picture.height > 16_000_000:raise ValueError('Photo dimensions are too large')
+                        picture=ImageOps.exif_transpose(picture)
+                        picture.load();picture.thumbnail((512,512))
+                        image=picture.convert('RGB');output=io.BytesIO();image.save(output,format='JPEG',quality=85)
+                    db.execute('INSERT OR REPLACE INTO avatar VALUES (1,?,?)',(output.getvalue(),uuid.uuid4().hex))
                 elif self.path == '/api/documents':
                     category = data.get('category','').strip()
                     if not category or len(category)>120: raise ValueError('Enter a requirement name')
@@ -87,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.execute('INSERT INTO documents VALUES (?,?)',(key,json.dumps(doc)))
                 else: return self.respond(404,{'error':'Not found'})
             self.respond(200,{'ok':True})
-        except (ValueError, TypeError, AttributeError):
+        except (ValueError, TypeError, AttributeError, UnidentifiedImageError, Image.DecompressionBombError):
             self.respond(400,{'error':'Check your fields, HTTPS links and file type/size (8 MB maximum).'})
         except (OSError, sqlite3.Error):
             self.respond(503,{'error':'Local storage unavailable. Try again; your form has not been cleared.'})

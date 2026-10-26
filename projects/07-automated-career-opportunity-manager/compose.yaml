@@ -31,11 +31,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       CAREERFLOW_WORKFLOW_TOKEN: ${CAREERFLOW_WORKFLOW_TOKEN}
       CAREERFLOW_APP_PASSWORD: ${CAREERFLOW_APP_PASSWORD:?Run scripts/setup_local.py}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: qwen3:4b
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8780/health', timeout=3)"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  ollama:
+    profiles: [assistant]
+    image: ollama/ollama@sha256:1685741456770df6e3cceb2a945a5f75e020f658d1701509668d6f4688f1dd3f
+    restart: unless-stopped
+    environment:
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_KEEP_ALIVE: 5m
+    volumes:
+      - project07_ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   profile:
     build:
@@ -105,6 +124,7 @@ services:
       retries: 5
 
 volumes:
+  project07_ollama_data:
   project07_postgres_data:
   project07_n8n_data:
   project07_engine_data:

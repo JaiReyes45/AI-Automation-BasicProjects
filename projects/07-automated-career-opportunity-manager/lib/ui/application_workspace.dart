@@ -4,15 +4,22 @@ import '../data/application_repository.dart';
 import '../domain/application.dart';
 import 'app_shell.dart';
 import 'app_theme.dart';
+import '../data/workspace_repository.dart';
+import 'email_panel.dart';
+import 'workspace_format.dart';
 
 class ApplicationWorkspace extends StatefulWidget {
   const ApplicationWorkspace({
     super.key,
     required this.repository,
     required this.onChanged,
+    this.title = 'Your applications',
+    this.initialStage,
   });
   final ApplicationRepository repository;
   final VoidCallback onChanged;
+  final String title;
+  final HiringStage? initialStage;
   @override
   State<ApplicationWorkspace> createState() => _ApplicationWorkspaceState();
 }
@@ -21,6 +28,14 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
   final search = TextEditingController();
   String? role;
   HiringStage? stage;
+  DateTimeRange? dates;
+  bool newestFirst = true;
+  @override
+  void initState() {
+    super.initState();
+    stage = widget.initialStage;
+  }
+
   @override
   void dispose() {
     search.dispose();
@@ -50,16 +65,34 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
     final all = widget.repository.applications;
     final roles = all.map((a) => a.role).toSet().toList()..sort();
     final query = search.text.trim().toLowerCase();
-    final apps = all
-        .where(
-          (a) =>
-              '${a.company} ${a.role} ${a.source}'.toLowerCase().contains(
-                query,
-              ) &&
-              (role == null || a.role == role) &&
-              (stage == null || a.stage == stage),
-        )
-        .toList();
+    final apps =
+        all
+            .where(
+              (a) =>
+                  '${a.company} ${a.role} ${a.source} ${a.jobDescription}'
+                      .toLowerCase()
+                      .contains(query) &&
+                  (role == null || a.role == role) &&
+                  (stage == null || a.stage == stage) &&
+                  (dates == null ||
+                      (a.submittedOn != null &&
+                          !DateTime.parse(a.submittedOn!)
+                              .isBefore(dates!.start) &&
+                          !DateTime.parse(a.submittedOn!).isAfter(dates!.end))),
+            )
+            .toList()
+          ..sort((a, b) {
+            if (a.submittedOn == null) {
+              return b.submittedOn == null ? a.company.compareTo(b.company) : 1;
+            }
+            if (b.submittedOn == null) return -1;
+            final order = a.submittedOn!.compareTo(b.submittedOn!);
+            return order == 0
+                ? a.company.compareTo(b.company)
+                : newestFirst
+                ? -order
+                : order;
+          });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -69,7 +102,7 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
-              'Your applications',
+              widget.title,
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             FilledButton.icon(
@@ -84,7 +117,7 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
           controller: search,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            labelText: 'Search company, role or source',
+            labelText: 'Search company, role or job description',
             prefixIcon: const Icon(Icons.search),
             suffixIcon: search.text.isEmpty
                 ? null
@@ -95,6 +128,45 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                   ),
             border: const OutlineInputBorder(),
           ),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.date_range_rounded),
+              label: Text(
+                dates == null
+                    ? 'Submission dates'
+                    : '${calendarDate(dates!.start.toIso8601String().substring(0, 10))} – ${calendarDate(dates!.end.toIso8601String().substring(0, 10))}',
+              ),
+              onPressed: () async {
+                final picked = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                  initialDateRange: dates,
+                  helpText: 'Filter by submission date',
+                );
+                if (picked != null && mounted) setState(() => dates = picked);
+              },
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.swap_vert_rounded),
+              label: Text(
+                newestFirst
+                    ? 'Newest submitted first'
+                    : 'Oldest submitted first',
+              ),
+              onPressed: () => setState(() => newestFirst = !newestFirst),
+            ),
+            if (dates != null)
+              TextButton(
+                onPressed: () => setState(() => dates = null),
+                child: const Text('Clear dates'),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -161,12 +233,16 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                 style: const TextStyle(color: muted),
               ),
             ),
-            if (query.isNotEmpty || role != null || stage != null)
+            if (query.isNotEmpty ||
+                role != null ||
+                stage != null ||
+                dates != null)
               TextButton(
                 onPressed: () => setState(() {
                   search.clear();
                   role = null;
                   stage = null;
+                  dates = null;
                 }),
                 child: const Text('Clear filters'),
               ),
@@ -200,6 +276,15 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(a.role),
+                        Text(
+                          a.submittedOn == null
+                              ? 'Submission date unknown'
+                              : 'Submitted ${calendarDate(a.submittedOn!)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: teal,
+                          ),
+                        ),
                         Text(a.source, style: const TextStyle(color: muted)),
                         const SizedBox(height: 10),
                         BadgePill(a.stage.label, const Color(0xFFEAF3ED), teal),
@@ -237,7 +322,12 @@ class ApplicationRecord extends StatefulWidget {
 
 class _ApplicationRecordState extends State<ApplicationRecord> {
   final form = GlobalKey<FormState>();
-  late final TextEditingController company, role, source, action;
+  late final TextEditingController company,
+      role,
+      source,
+      action,
+      submitted,
+      description;
   late HiringStage stage;
   JobApplication? record;
   late bool editing;
@@ -255,11 +345,13 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
     source = TextEditingController(text: record?.source ?? 'Manual entry');
     action = TextEditingController(text: record?.nextAction);
     stage = record?.stage ?? HiringStage.submitted;
+    submitted = TextEditingController(text: record?.submittedOn ?? '');
+    description = TextEditingController(text: record?.jobDescription ?? '');
   }
 
   @override
   void dispose() {
-    for (final c in [company, role, source, action]) {
+    for (final c in [company, role, source, action, submitted, description]) {
       c.dispose();
     }
     super.dispose();
@@ -271,6 +363,8 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
     source.text = record!.source;
     action.text = record!.nextAction ?? '';
     stage = record!.stage;
+    submitted.text = record!.submittedOn ?? '';
+    description.text = record!.jobDescription;
     setState(() => editing = false);
   }
 
@@ -320,6 +414,8 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
       source: source.text.trim(),
       stage: stage,
       nextAction: next,
+      submittedOn: submitted.text.trim().isEmpty ? null : submitted.text.trim(),
+      jobDescription: description.text.trim(),
       events: [...changes, ...?old?.events],
     );
     setState(() => saving = true);
@@ -408,6 +504,35 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                       field('Company', company),
                       field('Role title', role),
                       field('Source', source),
+                      TextFormField(
+                        controller: submitted,
+                        decoration: const InputDecoration(
+                          labelText: 'Submission date (YYYY-MM-DD, optional)',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return null;
+                          }
+                          final parsed = DateTime.tryParse(value.trim());
+                          return parsed == null ||
+                                  parsed.toIso8601String().substring(0, 10) !=
+                                      value.trim()
+                              ? 'Enter a real date as YYYY-MM-DD.'
+                              : null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: description,
+                        maxLines: 5,
+                        maxLength: 10000,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Job description / requirements (optional)',
+                          hintText: 'Paste the role description to make it searchable.',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       DropdownButtonFormField<HiringStage>(
                         initialValue: stage,
                         isExpanded: true,
@@ -467,6 +592,19 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                 ),
                 const SizedBox(height: 8),
                 Text('Source: ${record!.source}'),
+                Text(
+                  record!.submittedOn == null
+                      ? 'Submission date unknown'
+                      : 'Submitted ${calendarDate(record!.submittedOn!)}',
+                ),
+                if (record!.jobDescription.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Job description',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  SelectableText(record!.jobDescription),
+                ],
                 const SizedBox(height: 20),
                 BadgePill(record!.stage.label, const Color(0xFFEAF3ED), teal),
                 const SizedBox(height: 20),
@@ -483,6 +621,13 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                 const SizedBox(height: 8),
                 Text(record!.nextAction ?? 'No next action set.'),
                 const SizedBox(height: 28),
+                if (widget.repository is WorkspaceRepository) ...[
+                  EmailPanel(
+                    repository: widget.repository as WorkspaceRepository,
+                    applicationId: record!.id,
+                  ),
+                  const SizedBox(height: 28),
+                ],
                 Text('History', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 if (record!.events.isEmpty)
@@ -505,7 +650,9 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
               ],
               const SizedBox(height: 32),
               Text(
-                widget.repository.isDemo ? 'Session preview · Refreshing resets all changes.' : 'Application saved locally in PostgreSQL.',
+                widget.repository.isDemo
+                    ? 'Session preview · Refreshing resets all changes.'
+                    : 'Application saved locally in PostgreSQL.',
                 style: TextStyle(color: muted),
               ),
             ],

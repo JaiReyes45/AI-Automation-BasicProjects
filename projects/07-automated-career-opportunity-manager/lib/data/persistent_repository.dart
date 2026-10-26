@@ -15,6 +15,14 @@ class PersistentApplicationRepository extends WorkspaceRepository {
   @override
   bool get isDemo => false;
   @override
+  Map<String, dynamic> calendarData = {
+    'items': <dynamic>[],
+    'connection': <String, dynamic>{},
+  };
+  @override
+  List<Map<String, dynamic>> actionLog = [];
+
+  @override
   List<JobApplication> get applications => List.unmodifiable(_apps);
   void accept(String raw) {
     final rows = jsonDecode(raw)['applications'] as List;
@@ -27,6 +35,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         source: a['source'] ?? 'Gmail',
         stage: HiringStage.values.firstWhere((s) => s.name == a['stage']),
         nextAction: a['nextAction'],
+        submittedOn: a['submitted_on'],
+        jobDescription: a['job_description'] ?? '',
         events: (a['events'] as List)
             .map(
               (e) =>
@@ -46,6 +56,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         'review',
         'tasks',
         'deliveries',
+        'calendar',
+        'actions',
       ])
         profileRequest('GET', '/api/crm/$path', ''),
     ]);
@@ -59,7 +71,23 @@ class PersistentApplicationRepository extends WorkspaceRepository {
     reviewItems = items(results[2]);
     tasks = items(results[3]);
     deliveries = items(results[4]);
+    calendarData = Map<String, dynamic>.from(jsonDecode(results[5]));
+    actionLog = items(results[6]);
   }
+
+  @override
+  Future<Map<String, dynamic>> call(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async => Map<String, dynamic>.from(
+    jsonDecode(
+      await profileRequest(
+        body == null ? 'GET' : 'POST',
+        '/api/crm/$path',
+        body == null ? '' : jsonEncode(body),
+      ),
+    ),
+  );
 
   Future<void> mutate(String path, Map<String, dynamic> body) async {
     await profileRequest('POST', '/api/crm/$path', jsonEncode(body));
@@ -106,6 +134,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         'source': a.source,
         'stage': a.stage.name,
         'nextAction': a.nextAction,
+        'submitted_on': a.submittedOn,
+        'job_description': a.jobDescription,
         'version': versions[a.id] ?? 0,
       }),
     ),

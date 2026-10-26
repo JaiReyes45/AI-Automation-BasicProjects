@@ -13,3 +13,17 @@ window.careerUpload = function(category) {
  });
 };
 window.careerOpen = function(url) { const u=new URL(url,location.origin); if((u.origin==='http://localhost:5678' && u.pathname==='/') || u.protocol==='https:' || (u.origin===location.origin && u.pathname.startsWith('/api/files/'))) window.open(u.href,'_blank','noopener,noreferrer'); };
+
+window.careerPhoto = function() {
+ return new Promise((resolve,reject)=>{
+  const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg';
+  input.addEventListener('cancel',()=>resolve('cancelled'));
+  input.onchange=async()=>{try{
+   const f=input.files[0];if(!f){resolve('cancelled');return;}
+   if(f.size>4194304)throw new Error('Use a PNG or JPG under 4 MB.');
+   const reader=new FileReader();reader.onerror=()=>reject(new Error('Could not read photo'));
+   reader.onload=async()=>{try{await window.careerProfile('POST','/api/avatar',JSON.stringify({content:reader.result.split(',')[1]}));resolve('uploaded');}catch(e){reject(e);}};
+   reader.readAsDataURL(f);
+  }catch(e){reject(e);}};input.click();
+ });
+};

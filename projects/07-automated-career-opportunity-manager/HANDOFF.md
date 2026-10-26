@@ -1,6 +1,6 @@
-# CareerFlow local hand-off — 1.0.1
+# CareerFlow local hand-off — 1.1.0
 
-Delivered October 25, 2026 for one user on a trusted Windows/WSL Docker device.
+Updated October 26, 2026 for one user on a trusted Windows/WSL Docker device.
 
 ## Open your workspace
 
@@ -19,6 +19,8 @@ Delivered October 25, 2026 for one user on a trusted Windows/WSL Docker device.
 | Profile | Personal/professional links, internship requirements, local uploads and optional Drive links |
 | Automation | Recent career-email intake, conservative matching, duplicate protection, managed Gmail labels and delivery readback |
 | Operations | Connection timestamps, visible failed deliveries, bounded retries, sign-out and verified private backups |
+| Workspace 1.1 | Duolingo-inspired journey, submission-date filtering/sorting, descriptions, email detail and top-right profile/photo |
+| Calendar and assistant | Primary Google Calendar sync, local Qwen chat and explicit previews for edits/replies/meetings |
 
 Completing an action does not advance an application. There are no invented hiring probability scores. Ambiguous evidence needs a review decision.
 
@@ -29,10 +31,11 @@ Completing an action does not advance an application. There are no invented hiri
 3. [Backup and recovery](docs/backup-recovery.md)
 4. [Release verification and acceptance boundary](docs/release-verification.md)
 5. [Architecture](diagrams/architecture.md) and [sprint tracker](PROGRESS_TRACKER.md)
+6. [Workspace 1.1, local assistant and Calendar setup](docs/workspace-1.1.md)
 
 ## Acceptance boundary
 
-The local product implementation is complete for this release. Controlled end-to-end progression and recovery pass. Three genuine application confirmations and scheduled Gmail label delivery were verified during the pilot. A genuine subsequent employer email has not yet safely matched and advanced one of those applications; that field-acceptance check remains open. Do not force a match to close it.
+Controlled progression and recovery pass. Five genuine application confirmations and scheduled Gmail label delivery were verified. Calendar reading and the local assistant's count query pass. No real test reply or invitation was sent; verify the first intentional send/booking in Google. A genuine subsequent employer email has not yet safely matched and advanced an application; that field-acceptance check remains open. Do not force a match to close it.
 
 The seven-day subject filter cannot discover every possible employer email. The app requires manual review for unfamiliar formats. Public hosting, multiple users, mobile packaging, attachment extraction, school Drive OAuth, document deletion/versioning and calibrated hiring predictions are outside this release. Drive links use their existing sharing permissions.
 

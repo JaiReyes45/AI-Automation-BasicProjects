@@ -15,3 +15,7 @@ Future<String> profileRequest(String method, String path, String body) async =>
 Future<String> uploadDocument(String category) async =>
     (await upload(category.toJS).toDart).toDart;
 void openDocument(String url) => open(url.toJS);
+
+@JS('careerPhoto')
+external JSPromise<JSString> photo();
+Future<String> uploadPhoto() async => (await photo().toDart).toDart;

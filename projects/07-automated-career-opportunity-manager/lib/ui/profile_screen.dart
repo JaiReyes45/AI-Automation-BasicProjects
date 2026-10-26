@@ -8,7 +8,9 @@ import 'app_shell.dart';
 import 'app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.initialEdit = false, this.onSaved});
+  final bool initialEdit;
+  final VoidCallback? onSaved;
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -16,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   static const fields = {
     'name': 'Full name',
+    'headline': 'Headline / career focus',
     'email': 'Email address',
     'phone': 'Phone number',
     'location': 'City / location',
@@ -38,7 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final form = GlobalKey<FormState>();
   List<dynamic> docs = [];
   bool loading = true, busy = false, loaded = false;
-  String? error, notice;
+  String? error, notice, avatarUrl;
+  int tab = 0;
   @override
   void initState() {
     super.initState();
@@ -65,6 +69,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         loaded = true;
         docs = data['documents'];
+        avatarUrl = data['avatar_url'];
+        tab = widget.initialEdit || controllers['name']!.text.isEmpty ? 1 : 0;
         loading = false;
         error = null;
       });
@@ -197,6 +203,108 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Your details, professional links and documents. Ready when an employer asks.',
           style: TextStyle(color: muted),
         ),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 20,
+          runSpacing: 16,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: const Color(0xFFE2EDE6),
+              backgroundImage: avatarUrl == null
+                  ? null
+                  : NetworkImage(avatarUrl!),
+              child: avatarUrl == null
+                  ? const Icon(Icons.person_rounded, size: 42, color: teal)
+                  : null,
+            ),
+            OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () => run(() async {
+                      final result = await uploadPhoto();
+                      if (result == 'uploaded') {
+                        final data = jsonDecode(
+                          await profileRequest('GET', '/api/profile', ''),
+                        );
+                        if (mounted) {
+                          setState(() {
+                            avatarUrl = data['avatar_url'];
+                            notice = 'Profile photo saved.';
+                          });
+                        }
+                        widget.onSaved?.call();
+                      }
+                    }),
+              icon: const Icon(Icons.add_a_photo_outlined),
+              label: const Text('Upload photo'),
+            ),
+            const Text('PNG or JPG · up to 4 MB'),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final item in {
+              0: 'Profile',
+              1: 'Edit details',
+              2: 'Documents',
+            }.entries)
+              ChoiceChip(
+                label: Text(item.value),
+                selected: tab == item.key,
+                onSelected: busy ? null : (_) => setState(() => tab = item.key),
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        if (tab == 0)
+          Surface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  controllers['name']!.text.isEmpty
+                      ? 'Your profile'
+                      : controllers['name']!.text,
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                if (controllers['headline']!.text.isNotEmpty)
+                  Text(
+                    controllers['headline']!.text,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                const SizedBox(height: 20),
+                for (final entry in fields.entries.where(
+                  (e) =>
+                      e.key != 'name' &&
+                      e.key != 'headline' &&
+                      controllers[e.key]!.text.isNotEmpty,
+                ))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.value,
+                          style: const TextStyle(color: muted, fontSize: 12),
+                        ),
+                        SelectableText(controllers[entry.key]!.text),
+                      ],
+                    ),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() => tab = 1),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit personal information'),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 20),
         const Row(
           children: [
@@ -233,182 +341,199 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.only(bottom: 20),
             child: Text(notice!, style: const TextStyle(color: teal)),
           ),
-        Form(
-          key: form,
-          child: Column(
-            children: [
-              section(
-                'Personal details',
-                'Only fill in what you want to keep here.',
-                ['name', 'email', 'phone', 'location'],
-              ),
-              section(
-                'Internship',
-                'Keep your school requirements close to your applications.',
-                ['school', 'course', 'year', 'hours', 'availability', 'notes'],
-              ),
-              section(
-                'Professional links',
-                'Links are saved as references. No account connection is required.',
-                ['linkedin', 'github', 'portfolio', 'drive'],
-              ),
-            ],
-          ),
-        ),
-        FilledButton.icon(
-          onPressed: busy
-              ? null
-              : () => run(() async {
-                  if (!form.currentState!.validate()) return;
-                  await profileRequest(
-                    'POST',
-                    '/api/profile',
-                    jsonEncode({
-                      for (final k in fields.keys)
-                        k: controllers[k]!.text.trim(),
-                    }),
-                  );
-                  if (mounted) {
-                    setState(() => notice = 'Profile saved locally.');
-                  }
-                }),
-          icon: const Icon(Icons.check, size: 18),
-          label: Text(busy ? 'Working…' : 'Save profile'),
-        ),
-        const SizedBox(height: 40),
-        const Divider(),
-        const SizedBox(height: 24),
-        Text(
-          'Documents & requirements',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Resume, student consent form, endorsement letter, or any requirement from your school. Uploads stay local; Drive links keep the original sharing permissions.',
-          style: TextStyle(color: muted),
-        ),
-        const SizedBox(height: 24),
-        Surface(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: requirement,
-                maxLength: 120,
-                decoration: const InputDecoration(
-                  labelText: 'Requirement name',
-                  helperText: 'For example: Student consent form',
+        if (tab == 1) ...[
+          Form(
+            key: form,
+            child: Column(
+              children: [
+                section(
+                  'Personal details',
+                  'Only fill in what you want to keep here.',
+                  ['name', 'headline', 'email', 'phone', 'location'],
                 ),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: busy
-                    ? null
-                    : () => run(() async {
-                        if (requirement.text.trim().isEmpty) {
-                          setState(
-                            () => error = 'Enter a requirement name first.',
-                          );
-                          return;
-                        }
-                        final result = await uploadDocument(
-                          requirement.text.trim(),
-                        );
-                        if (result == 'uploaded') {
-                          await refreshDocs();
-                          if (mounted) {
-                            setState(() => notice = 'Document stored locally.');
-                          }
-                        }
-                      }),
-                icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Upload local file'),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'PDF, DOCX, PNG or JPG · Up to 8 MB',
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: link,
-                decoration: const InputDecoration(
-                  labelText: 'Or paste an HTTPS document link',
-                  hintText: 'https://drive.google.com/...',
+                section(
+                  'Internship',
+                  'Keep your school requirements close to your applications.',
+                  [
+                    'school',
+                    'course',
+                    'year',
+                    'hours',
+                    'availability',
+                    'notes',
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: busy
-                    ? null
-                    : () => run(() async {
-                        final u = Uri.tryParse(link.text.trim());
-                        if (requirement.text.trim().isEmpty ||
-                            u == null ||
-                            u.scheme != 'https' ||
-                            u.host.isEmpty) {
-                          setState(
-                            () => error = 'Enter a requirement name and a valid HTTPS link.',
-                          );
-                          return;
-                        }
-                        await profileRequest(
-                          'POST',
-                          '/api/documents',
-                          jsonEncode({
-                            'category': requirement.text.trim(),
-                            'url': link.text.trim(),
-                          }),
-                        );
-                        await refreshDocs();
-                        link.clear();
-                        if (mounted) {
-                          setState(() => notice = 'Document link saved.');
-                        }
-                      }),
-                icon: const Icon(Icons.add_link),
-                label: const Text('Save document link'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        if (docs.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              'No documents yet. Add your resume or first school requirement above.',
-              style: TextStyle(color: muted),
+                section(
+                  'Professional links',
+                  'Links are saved as references. No account connection is required.',
+                  ['linkedin', 'github', 'portfolio', 'drive'],
+                ),
+              ],
             ),
           ),
-        for (final d in docs)
-          Column(
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  d['size'] == 0 ? Icons.link : Icons.description_outlined,
-                  color: teal,
-                ),
-                title: Text(d['category']),
-                subtitle: Text(
-                  '${d['name']} · ${d['size'] == 0 ? 'External link' : 'Local file'}',
-                ),
-                trailing: IconButton(
-                  tooltip: d['size'] == 0
-                      ? 'Open document link'
-                      : 'Download document',
-                  onPressed: () => openDocument(d['url']),
-                  icon: Icon(
-                    d['size'] == 0
-                        ? Icons.open_in_new
-                        : Icons.download_outlined,
+          FilledButton.icon(
+            onPressed: busy
+                ? null
+                : () => run(() async {
+                    if (!form.currentState!.validate()) return;
+                    await profileRequest(
+                      'POST',
+                      '/api/profile',
+                      jsonEncode({
+                        for (final k in fields.keys)
+                          k: controllers[k]!.text.trim(),
+                      }),
+                    );
+                    if (mounted) {
+                      setState(() {
+                        notice = 'Profile saved locally.';
+                        tab = 0;
+                      });
+                      widget.onSaved?.call();
+                    }
+                  }),
+            icon: const Icon(Icons.check, size: 18),
+            label: Text(busy ? 'Working…' : 'Save profile'),
+          ),
+        ],
+        if (tab == 2) ...[
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 24),
+          Text(
+            'Documents & requirements',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Resume, student consent form, endorsement letter, or any requirement from your school. Uploads stay local; Drive links keep the original sharing permissions.',
+            style: TextStyle(color: muted),
+          ),
+          const SizedBox(height: 24),
+          Surface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: requirement,
+                  maxLength: 120,
+                  decoration: const InputDecoration(
+                    labelText: 'Requirement name',
+                    helperText: 'For example: Student consent form',
                   ),
                 ),
-              ),
-              const Divider(),
-            ],
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          if (requirement.text.trim().isEmpty) {
+                            setState(
+                              () => error = 'Enter a requirement name first.',
+                            );
+                            return;
+                          }
+                          final result = await uploadDocument(
+                            requirement.text.trim(),
+                          );
+                          if (result == 'uploaded') {
+                            await refreshDocs();
+                            if (mounted) {
+                              setState(
+                                () => notice = 'Document stored locally.',
+                              );
+                            }
+                          }
+                        }),
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Upload local file'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'PDF, DOCX, PNG or JPG · Up to 8 MB',
+                  style: TextStyle(color: muted, fontSize: 12),
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: link,
+                  decoration: const InputDecoration(
+                    labelText: 'Or paste an HTTPS document link',
+                    hintText: 'https://drive.google.com/...',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          final u = Uri.tryParse(link.text.trim());
+                          if (requirement.text.trim().isEmpty ||
+                              u == null ||
+                              u.scheme != 'https' ||
+                              u.host.isEmpty) {
+                            setState(
+                              () => error = 'Enter a requirement name and a valid HTTPS link.',
+                            );
+                            return;
+                          }
+                          await profileRequest(
+                            'POST',
+                            '/api/documents',
+                            jsonEncode({
+                              'category': requirement.text.trim(),
+                              'url': link.text.trim(),
+                            }),
+                          );
+                          await refreshDocs();
+                          link.clear();
+                          if (mounted) {
+                            setState(() => notice = 'Document link saved.');
+                          }
+                        }),
+                  icon: const Icon(Icons.add_link),
+                  label: const Text('Save document link'),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 24),
+          if (docs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'No documents yet. Add your resume or first school requirement above.',
+                style: TextStyle(color: muted),
+              ),
+            ),
+          for (final d in docs)
+            Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    d['size'] == 0 ? Icons.link : Icons.description_outlined,
+                    color: teal,
+                  ),
+                  title: Text(d['category']),
+                  subtitle: Text(
+                    '${d['name']} · ${d['size'] == 0 ? 'External link' : 'Local file'}',
+                  ),
+                  trailing: IconButton(
+                    tooltip: d['size'] == 0
+                        ? 'Open document link'
+                        : 'Download document',
+                    onPressed: () => openDocument(d['url']),
+                    icon: Icon(
+                      d['size'] == 0
+                          ? Icons.open_in_new
+                          : Icons.download_outlined,
+                    ),
+                  ),
+                ),
+                const Divider(),
+              ],
+            ),
+        ],
       ],
     );
   }

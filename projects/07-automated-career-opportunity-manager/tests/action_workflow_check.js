@@ -1,0 +1,18 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=require('node:assert/strict');
+const w=JSON.parse(fs.readFileSync(path.join(__dirname,'../workflows/08-approved-replies.json'),'utf8'));
+const send=w.nodes.find(n=>n.name==='Send confirmed reply');
+assert.equal(send.retryOnFail,false);
+const plan={id:'synthetic',lease:'lease',to:'hr@example.test',subject:'Re: Interview',body:'Thank you!\nI can attend.',thread_id:'thread'};
+const code=w.nodes.find(n=>n.name==='Prepare reply').parameters.jsCode;
+const result=new Function('$json','$',code)({payload:{headers:[{name:'Message-ID',value:'<synthetic@example.test>'}]}},()=>({item:{json:plan}})).json;
+const mime=Buffer.from(result.raw,'base64url').toString('utf8');
+assert.ok(mime.includes('\r\n\r\n'));
+assert.ok(mime.includes('In-Reply-To: <synthetic@example.test>'));
+assert.ok(mime.includes('To: hr@example.test'));
+const outcome=w.nodes.find(n=>n.name==='Reply outcome').parameters.jsCode;
+const failed=new Function('$json','$',outcome)({statusCode:0},()=>({item:{json:plan}})).json;
+assert.equal(failed.uncertain,true);
+assert.equal(failed.ok,false);
+console.log('PASS: reviewed reply worker builds valid MIME and never blindly retries a send.');

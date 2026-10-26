@@ -14,3 +14,7 @@ ALTER TABLE career.messages ADD COLUMN IF NOT EXISTS revision integer NOT NULL D
 CREATE TABLE IF NOT EXISTS career.tasks(id text PRIMARY KEY, data jsonb NOT NULL, version integer NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS career.audit(id bigserial PRIMARY KEY, kind text NOT NULL, data jsonb NOT NULL);
 CREATE INDEX IF NOT EXISTS label_jobs_pending ON career.label_jobs(account,state,next_attempt) WHERE eligible;
+
+CREATE TABLE IF NOT EXISTS career.calendar_events(id text PRIMARY KEY, data jsonb NOT NULL, version integer NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS career.calendar_connection(id integer PRIMARY KEY, data jsonb NOT NULL);
+CREATE TABLE IF NOT EXISTS career.actions(id text PRIMARY KEY, kind text NOT NULL, state text NOT NULL, data jsonb NOT NULL, created double precision NOT NULL, lease double precision, lease_token text, attempts integer NOT NULL DEFAULT 0);

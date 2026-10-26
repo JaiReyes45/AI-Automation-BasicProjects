@@ -1,0 +1,451 @@
+{
+  "id": "project07Calendar",
+  "name": "Project 07 - 09 Calendar and confirmed meetings",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Execute manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "id": "Primary calendar",
+      "name": "Primary calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "position": [
+        230,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "rkf0GTF07ovWV6Ko",
+          "name": "CareerFlow Calendar"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Read calendar events",
+      "name": "Read calendar events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=100&timeMin={{ new Date(Date.now()-30*86400000).toISOString() }}&timeMax={{ new Date(Date.now()+180*86400000).toISOString() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 25000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken || \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.nextPageToken }}",
+              "limitPagesFetched": true,
+              "maxRequests": 20
+            }
+          }
+        }
+      },
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "rkf0GTF07ovWV6Ko",
+          "name": "CareerFlow Calendar"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Calendar snapshot",
+      "name": "Calendar snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const pages=$input.all();if(pages.at(-1).json.nextPageToken)throw new Error('Calendar exceeds 2000 events. Narrow the window.');return [{json:{calendar_name:$('Primary calendar').first().json.summary,window_start:new Date(Date.now()-30*86400000).toISOString(),window_end:new Date(Date.now()+180*86400000).toISOString(),items:pages.flatMap(p=>p.json.items||[])}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "id": "Save calendar snapshot",
+      "name": "Save calendar snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "http://crm:8780/internal/calendar/import",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 25000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "position": [
+        920,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Claim confirmed meetings",
+      "name": "Claim confirmed meetings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "http://crm:8780/internal/actions/claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 25000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({kind:\"meeting\"}) }}"
+      },
+      "position": [
+        1150,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Meeting jobs",
+      "name": "Meeting jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return ($json.jobs||[]).map(json=>({json}));",
+        "mode": "runOnceForAllItems"
+      },
+      "position": [
+        1380,
+        300
+      ]
+    },
+    {
+      "id": "Create confirmed event",
+      "name": "Create confirmed event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "={{ \"https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=\"+($json.attendees.length?\"all\":\"none\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({id:$json.event_id,summary:$json.title,description:$json.description,location:$json.location,start:{dateTime:$json.start,timeZone:\"Asia/Manila\"},end:{dateTime:$json.end,timeZone:\"Asia/Manila\"},attendees:$json.attendees.map(email=>({email})),extendedProperties:{private:{careerflow_event:$json.event_id}}}) }}"
+      },
+      "position": [
+        1610,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "rkf0GTF07ovWV6Ko",
+          "name": "CareerFlow Calendar"
+        }
+      },
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Read back event",
+      "name": "Read back event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "={{ \"https://www.googleapis.com/calendar/v3/calendars/primary/events/\"+encodeURIComponent($(\"Meeting jobs\").item.json.event_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "position": [
+        1840,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "rkf0GTF07ovWV6Ko",
+          "name": "CareerFlow Calendar"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Meeting outcome",
+      "name": "Meeting outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const p=$('Meeting jobs').item.json;const b=$json.body||{};const ok=$json.statusCode===200&&b.id===p.event_id&&b.extendedProperties?.private?.careerflow_event===p.event_id&&Date.parse(b.start?.dateTime)===Date.parse(p.start)&&Date.parse(b.end?.dateTime)===Date.parse(p.end);return {json:{id:p.id,lease:p.lease,ok,external_id:b.id,error:'Calendar readback did not confirm the event. Status '+($json.statusCode||0)}};",
+        "mode": "runOnceForEachItem"
+      },
+      "position": [
+        2070,
+        300
+      ]
+    },
+    {
+      "id": "Record meeting outcome",
+      "name": "Record meeting outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "http://crm:8780/internal/actions/result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 25000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "position": [
+        2300,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Scheduled worker",
+      "name": "Scheduled worker",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Primary calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Primary calendar": {
+      "main": [
+        [
+          {
+            "node": "Read calendar events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read calendar events": {
+      "main": [
+        [
+          {
+            "node": "Calendar snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar snapshot": {
+      "main": [
+        [
+          {
+            "node": "Save calendar snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save calendar snapshot": {
+      "main": [
+        [
+          {
+            "node": "Claim confirmed meetings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim confirmed meetings": {
+      "main": [
+        [
+          {
+            "node": "Meeting jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meeting jobs": {
+      "main": [
+        [
+          {
+            "node": "Create confirmed event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create confirmed event": {
+      "main": [
+        [
+          {
+            "node": "Read back event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read back event": {
+      "main": [
+        [
+          {
+            "node": "Meeting outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meeting outcome": {
+      "main": [
+        [
+          {
+            "node": "Record meeting outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduled worker": {
+      "main": [
+        [
+          {
+            "node": "Primary calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "executionTimeout": 240,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

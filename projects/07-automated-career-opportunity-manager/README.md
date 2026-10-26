@@ -5,11 +5,11 @@ n8n, Python, and Docker.
 
 ## Status
 
-**Local client hand-off release 1.0.1.** Reviewed: 2026-10-26.
+**Local client hand-off release 1.1.0.** Reviewed: 2026-10-26.
 
 Application CRM, review decisions, dated actions, profile/document storage, scheduled
-Gmail intake and label recovery are implemented. Start with [HANDOFF.md](HANDOFF.md).
-The release has 22 passing Flutter tests and 38 engine/provider tests, API acceptance
+Gmail intake and label recovery are implemented, along with the [unified workspace](docs/workspace-1.1.md): submission dates, email details, profile photo, Google Calendar and local Ollama assistant. Start with [HANDOFF.md](HANDOFF.md).
+The release has 27 passing Flutter tests and 38 engine/provider tests, API acceptance
 checks and a verified isolated backup restore. Genuine employer follow-up progression
 remains a field-acceptance item; controlled submission-to-hired progression passes.
 
@@ -22,7 +22,9 @@ inventing hiring probabilities.
 
 ## Implemented behavior
 
-- Search and filter applications by company, role, source and stage.
+- Search company, role, source and saved job description; filter submission dates and stage, with newest/oldest ordering.
+- Follow rounded journey cards, open linked email text, and access your profile/photo from the top-right avatar.
+- Sync Google Calendar; preview and explicitly confirm replies, meetings and assistant-proposed edits.
 - Add/edit distinct applications, preserve manual history, and track next actions.
 - Save profile details and internship requirements in a local Docker folder.
 - Upload/download PDF, DOCX, PNG and JPG files up to 8 MB; save external Drive links.
@@ -42,6 +44,7 @@ Google Drive links do not connect an account or change sharing permissions.
 - Python profile service with SQLite metadata and local document files.
 - n8n 2.34.5 on loopback port 5678; PostgreSQL 16 stores n8n state and the career schema.
 - Private Python CRM API with workspace sessions and revision checks.
+- Private Ollama container running Qwen3 4B for bounded local chat and action proposals.
 - Private Python synthetic workflow engine with persistent SQLite test storage.
 - Isolated Compose project: `project07-automated-career-opportunity-manager`.
 
@@ -57,7 +60,7 @@ See the [architecture diagram](diagrams/architecture.md).
 | `lib/`, `web/`, `test/` | Flutter sources, web bridge and widget tests |
 | `crm/`, `database/`, `profile_service/`, `workflow/` | Shared CRM API/schema, profile API and synthetic engine |
 | `fixtures/`, `tests/`, `scripts/` | Synthetic fixtures, regression tests and operator tools |
-| `workflows/` | Seven portable, inactive exports; local workflows 06/07 are published |
+| `workflows/` | Nine portable, inactive exports; local workflows 06/07/08/09 are published |
 | `docker/` | Container build files and nginx configuration |
 
 ## Workflow map
@@ -71,6 +74,8 @@ See the [architecture diagram](diagrams/architecture.md).
 | 05 | Prepare managed Gmail labels |
 | 06 | Five-minute Gmail intake, pagination and duplicate filtering |
 | 07 | Five-minute Gmail label reconciliation and readback |
+| 08 | One-minute worker for explicitly confirmed Gmail replies |
+| 09 | Five-minute primary Calendar sync and explicitly confirmed meetings |
 
 Exports contain synthetic examples, no execution data or secret values. Configure
 local credentials using the setup guide before running them.
@@ -92,6 +97,7 @@ python3 tests/profile_storage_check.py
 flutter analyze
 flutter test
 flutter build web --no-web-resources-cdn
+python3 scripts/finalize_web.py
 ```
 
 Run Docker commands from the portfolio repository root with the explicit project

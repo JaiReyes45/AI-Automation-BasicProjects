@@ -1,15 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../data/application_repository.dart';
-import '../domain/application.dart';
 import 'app_theme.dart';
 import 'application_workspace.dart';
 import 'profile_screen.dart';
 import '../data/workspace_repository.dart';
 import 'workspace_screens.dart';
 import 'workspace_format.dart';
+import 'calendar_screen.dart';
+import 'assistant_screen.dart';
+import 'application_journey.dart';
+import '../domain/application.dart';
+import '../data/profile_stub.dart'
+    if (dart.library.js_interop) '../data/profile_web.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.repository, this.onLogout});
@@ -24,7 +30,77 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool refreshing = false;
   Timer? refreshTimer;
   bool foreground = true;
-  String? refreshError;
+  String? refreshError, avatarUrl;
+  String profileName = '';
+  bool profileEditing = false;
+  HiringStage? journeyStage;
+
+  Future<void> loadProfileHeader() async {
+    try {
+      final data = jsonDecode(await profileRequest('GET', '/api/profile', ''));
+      if (mounted) {
+        setState(() {
+          profileName = data['profile']['name'] ?? '';
+          avatarUrl = data['avatar_url'];
+        });
+      }
+    } catch (_) {
+      /* A profile outage must not hide the CRM. */
+    }
+  }
+
+  Widget profileMenu() => PopupMenuButton<String>(
+    tooltip: 'Profile menu',
+    onSelected: (value) {
+      if (value == 'logout') {
+        widget.onLogout?.call();
+        return;
+      }
+      setState(() {
+        selected = 4;
+        profileEditing = value == 'edit';
+      });
+    },
+    itemBuilder: (_) => [
+      const PopupMenuItem(value: 'view', child: Text('View profile')),
+      const PopupMenuItem(
+        value: 'edit',
+        child: Text('Edit personal information'),
+      ),
+      if (widget.onLogout != null)
+        const PopupMenuItem(value: 'logout', child: Text('Sign out')),
+    ],
+    child: Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: const Color(0xFFE0EDE4),
+            backgroundImage: avatarUrl == null
+                ? null
+                : NetworkImage(avatarUrl!),
+            child: avatarUrl == null
+                ? const Icon(Icons.person_rounded, color: teal)
+                : null,
+          ),
+          if (MediaQuery.sizeOf(context).width >= 1000) ...[
+            const SizedBox(width: 10),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                profileName.isEmpty ? 'Your profile' : profileName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+          const Icon(Icons.expand_more_rounded, size: 20),
+        ],
+      ),
+    ),
+  );
 
   bool get canAutoRefresh =>
       mounted &&
@@ -36,6 +112,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    loadProfileHeader();
     if (widget.repository is WorkspaceRepository) {
       refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         if (canAutoRefresh) refreshWorkspace();
@@ -84,6 +161,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     'Profile',
     'Review inbox',
     'Actions',
+    'Calendar',
+    'Assistant',
   ];
   static const icons = [
     Icons.grid_view_rounded,
@@ -93,6 +172,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     Icons.person_outline,
     Icons.mark_email_unread_outlined,
     Icons.checklist_outlined,
+    Icons.calendar_month_rounded,
+    Icons.chat_bubble_outline_rounded,
   ];
 
   @override
@@ -104,6 +185,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           : AppBar(
               title: const Text('CareerFlow'),
               backgroundColor: Colors.white,
+              actions: [profileMenu()],
             ),
       drawer: wide ? null : Drawer(child: navigation(isDrawer: true)),
       body: Row(
@@ -129,12 +211,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           style: const TextStyle(color: muted, fontSize: 13),
                         ),
                       ),
-                      if (wide)
-                        const BadgePill(
-                          'Personal workspace',
-                          Color(0xFFEBF1EC),
-                          ink,
-                        ),
+                      if (wide) profileMenu(),
                     ],
                   ),
                 ),
@@ -151,7 +228,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           children: [
                             if (widget.repository.isDemo && selected != 4)
                               const DemoNotice(),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 8),
                             if (widget.repository is WorkspaceRepository)
                               Align(
                                 alignment: Alignment.centerRight,
@@ -233,13 +310,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ],
           ),
           const SizedBox(height: 32),
-          for (int i = 0; i < titles.length; i++)
+          for (final i in [0, 1, 5, 6, 7, 8, 2, 3])
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 key: ValueKey('nav-$i'),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: selected == i
+                        ? const Color(0xFFB2CFBE)
+                        : Colors.transparent,
+                    width: 2,
+                  ),
                 ),
                 selected: selected == i,
                 selectedTileColor: const Color(0xFFE7EEEB),
@@ -253,7 +336,10 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
                 ),
                 onTap: () {
-                  setState(() => selected = i);
+                  setState(() {
+                    selected = i;
+                    journeyStage = null;
+                  });
                   if (isDrawer) Navigator.pop(context);
                 },
               ),
@@ -315,11 +401,37 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   'Sign in to your saved workspace to manage dated actions.',
                 ),
         ];
+      case 7:
+        return [
+          widget.repository is WorkspaceRepository
+              ? CalendarScreen(
+                  repository: widget.repository as WorkspaceRepository,
+                  onChanged: () => setState(() {}),
+                )
+              : const Text('Sign in to use the calendar.'),
+        ];
+      case 8:
+        return [
+          widget.repository is WorkspaceRepository
+              ? AssistantScreen(
+                  repository: widget.repository as WorkspaceRepository,
+                  onChanged: () => setState(() {}),
+                )
+              : const Text('Sign in to use your local assistant.'),
+        ];
       case 4:
-        return [const ProfileScreen()];
+        return [
+          ProfileScreen(
+            key: ValueKey(profileEditing),
+            initialEdit: profileEditing,
+            onSaved: loadProfileHeader,
+          ),
+        ];
       case 1:
         return [
           ApplicationWorkspace(
+            key: ValueKey(journeyStage),
+            initialStage: journeyStage,
             repository: widget.repository,
             onChanged: () => setState(() {}),
           ),
@@ -379,126 +491,66 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
         ];
       default:
-        final actions = apps.where((a) => a.nextAction != null).toList();
         return [
-          heading(
-            context,
-            'Application overview',
-            'Track employer updates and what you need to do next.',
-          ),
-          const SizedBox(height: 26),
-          Text(
-            '${apps.length} applications · ${actions.length} have next-action notes',
-            style: const TextStyle(color: muted),
-          ),
-          const SizedBox(height: 16),
-          if (widget.repository is WorkspaceRepository)
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                OutlinedButton(
-                  onPressed: () => setState(() => selected = 5),
-                  child: Text(
-                    'Review ${(widget.repository as WorkspaceRepository).connection['review_count'] ?? 0} messages',
-                  ),
-                ),
-                OutlinedButton(
-                  onPressed: () => setState(() => selected = 6),
-                  child: const Text('View actions'),
-                ),
-              ],
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE4EFE3),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFB6CEB5), width: 2),
             ),
-          const SizedBox(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final main = applicationPanel(apps);
-              final side = Surface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your next chapter starts here.',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${apps.length} applications. One place to keep moving forward.',
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
-                    const Text(
-                      'Next-action notes',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Manage due dates and completed tasks in Actions.',
-                      style: TextStyle(fontSize: 12, color: muted),
-                    ),
-                    const SizedBox(height: 18),
-                    if (actions.isEmpty)
-                      const Text('Nothing needs your attention yet.'),
-                    for (final a in actions)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 3),
-                              child: Icon(
-                                Icons.arrow_circle_right_outlined,
-                                size: 20,
-                                color: teal,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    a.nextAction!,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    a.company,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                    if (widget.repository is WorkspaceRepository)
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() => selected = 5),
+                        icon: const Icon(Icons.mark_email_unread_outlined),
+                        label: Text(
+                          'Review ${(widget.repository as WorkspaceRepository).connection['review_count'] ?? 0} messages',
                         ),
                       ),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'About these stages',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    OutlinedButton.icon(
+                      onPressed: () => setState(() => selected = 7),
+                      icon: const Icon(Icons.calendar_month_rounded),
+                      label: const Text('Interview calendar'),
                     ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Stages reflect employer updates. They do not represent a probability of being hired.',
-                      style: TextStyle(fontSize: 12, color: muted),
+                    TextButton(
+                      onPressed: () => setState(() => selected = 6),
+                      child: const Text('View actions'),
                     ),
                   ],
                 ),
-              );
-              if (constraints.maxWidth < 850) {
-                return Column(
-                  children: [main, const SizedBox(height: 20), side],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 7, child: main),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 3, child: side),
-                ],
-              );
-            },
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+          ApplicationJourney(
+            applications: apps,
+            onStage: (stage) => setState(() {
+              journeyStage = stage;
+              selected = 1;
+            }),
+          ),
+          const SizedBox(height: 28),
+          ApplicationWorkspace(
+            repository: widget.repository,
+            onChanged: () => setState(() {}),
+            title: 'Application pipeline',
           ),
         ];
     }
@@ -513,97 +565,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           Text(description, style: const TextStyle(color: muted)),
         ],
       );
-
-  Widget applicationPanel(List<JobApplication> apps) => Surface(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Application pipeline',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Company, role, and current stage',
-          style: TextStyle(fontSize: 12, color: muted),
-        ),
-        const SizedBox(height: 18),
-        if (apps.isEmpty) const Text('No applications yet.'),
-        for (int i = 0; i < apps.length; i++) ...[
-          if (i > 0) const Divider(height: 28),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final a = apps[i];
-              final info = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF1E8),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      a.company.isEmpty ? '?' : a.company[0],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: teal,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          a.company,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          a.role,
-                          style: const TextStyle(fontSize: 12, color: muted),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          a.source,
-                          style: const TextStyle(fontSize: 12, color: muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-              final badge = BadgePill(
-                a.stage.label,
-                a.stage == HiringStage.interview
-                    ? const Color(0xFFE1F0E7)
-                    : const Color(0xFFF0F1F6),
-                a.stage == HiringStage.interview
-                    ? teal
-                    : const Color(0xFF626580),
-              );
-              if (constraints.maxWidth < 470) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [info, const SizedBox(height: 10), badge],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: info),
-                  const SizedBox(width: 12),
-                  badge,
-                ],
-              );
-            },
-          ),
-        ],
-      ],
-    ),
-  );
 }
 
 class Surface extends StatelessWidget {
@@ -615,8 +576,9 @@ class Surface extends StatelessWidget {
     padding: const EdgeInsets.all(22),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: border),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: border, width: 2),
+      boxShadow: const [BoxShadow(color: border, offset: Offset(0, 4))],
     ),
     child: Material(color: Colors.transparent, child: child),
   );

@@ -22,11 +22,13 @@ Older evidence cannot overwrite a newer stage. A stale message can still be link
 
 Open **Actions** to add an application-specific reply, assessment, interview, follow-up or other task. A due date is optional: leave it blank when the employer gave none. Dates use the Manila calendar; visible email/sync timestamps are also Manila time.
 
-Complete or reopen a task from its controls. This records progress on your work without asserting employer progress. Follow-up suggestions after inactivity are suggestions, not deadlines or rejections. The app does not send replies or calendar invitations.
+Complete or reopen a task from its controls. This records progress on your work without asserting employer progress. Follow-up suggestions after inactivity are suggestions, not deadlines or rejections. Sending a reply or invitation is a separate reviewed action in an email record, Calendar or Assistant; it requires explicit confirmation.
 
 ## Profile and internship documents
 
-Save personal details, LinkedIn/GitHub/portfolio URLs and requirements in Profile. Upload PDF, DOCX, PNG or JPG files up to 8 MB, or save an HTTPS Drive link. Files persist under the Docker project's `local-data/profile` folder. Drive links do not connect the school account or change file permissions. Keep the private backup separate from the public release ZIP.
+Open the top-right avatar menu to view or edit your profile. Save personal details, LinkedIn/GitHub/portfolio URLs and requirements, or upload a PNG/JPG profile photo up to 4 MB. The Documents tab accepts PDF, DOCX, PNG or JPG files up to 8 MB, or an HTTPS Drive link. Files persist under the Docker project's `local-data/profile` folder. Drive links do not connect the school account or change file permissions. Keep the private backup separate from the public release ZIP.
+
+See the [workspace 1.1 guide](workspace-1.1.md) for submission-date filtering, email detail, Calendar and the local assistant.
 
 ## Connections and recovery
 

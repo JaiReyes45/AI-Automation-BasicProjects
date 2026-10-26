@@ -138,6 +138,9 @@ Future<void> nav(WidgetTester tester, int index) async {
     await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
   }
   await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+  await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(ValueKey('nav-$index')));
   await tester.pumpAndSettle();
 }

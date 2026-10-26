@@ -14,7 +14,7 @@ void main() {
     await tester.pumpWidget(
       CareerFlowApp(repository: DemoApplicationRepository()),
     );
-    expect(find.text('Application overview'), findsOneWidget);
+    expect(find.text('Application pipeline'), findsOneWidget);
     expect(find.textContaining('Fictional applications only'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('nav-1')));
     await tester.pumpAndSettle();

@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PREFIX='project07-automated-career-opportunity-manager-'
 PG=PREFIX+'postgres-1'
+EXTRA_TABLES=('tasks','audit','calendar_events','calendar_connection','actions')
 
 def run(args, **kwargs):
     result=subprocess.run(args,capture_output=True,**kwargs)
@@ -26,7 +27,7 @@ def counts(database='careerflow', extra=None):
     sql="SELECT 'applications',count(*) FROM career.applications UNION ALL SELECT 'messages',count(*) FROM career.messages UNION ALL SELECT 'events',count(*) FROM career.events UNION ALL SELECT 'credentials',count(*) FROM credentials_entity UNION ALL SELECT 'workflows',count(*) FROM workflow_entity"
     if extra:
         for table in extra:
-            if table not in ('tasks','audit'):
+            if table not in EXTRA_TABLES:
                 raise ValueError('Unexpected backup table')
             sql+=" UNION ALL SELECT '"+table+"',count(*) FROM career."+table
     raw=run(['docker','exec',PG,'psql','-U','careerflow','-d',database,'-At','-F',':','-c',sql],text=True)
@@ -46,7 +47,7 @@ def verify(folder):
         run(['docker','exec',PG,'psql','-U','careerflow','-d','postgres','-v','ON_ERROR_STOP=1','-c','CREATE DATABASE '+database],text=True)
         created=True
         run(['docker','exec','-i',PG,'pg_restore','-U','careerflow','--no-owner','--no-acl','--exit-on-error','-d',database],input=(folder/'postgres.dump').read_bytes())
-        assert counts(database,[t for t in ('tasks','audit') if t in manifest['counts']])==manifest['counts'], 'Restored row counts differ'
+        assert counts(database,[t for t in EXTRA_TABLES if t in manifest['counts']])==manifest['counts'], 'Restored row counts differ'
         profile=folder/'profile'/'profile.sqlite'
         if profile.exists():
             with sqlite3.connect('file:'+profile.as_posix()+'?mode=ro',uri=True) as db:
@@ -82,7 +83,7 @@ def backup():
             if path.is_file() and not path.is_symlink():
                 os.chmod(path,0o600)
                 digests[path.relative_to(destination).as_posix()]=hashlib.sha256(path.read_bytes()).hexdigest()
-        manifest=dict(created_at=datetime.now(timezone.utc).isoformat(),counts=counts(extra=['tasks','audit']),sha256=digests)
+        manifest=dict(created_at=datetime.now(timezone.utc).isoformat(),counts=counts(extra=EXTRA_TABLES),sha256=digests)
         (destination/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
         os.chmod(destination/'manifest.json',0o600)
     finally:

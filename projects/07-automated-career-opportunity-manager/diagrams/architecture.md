@@ -6,6 +6,12 @@ flowchart LR
   Web --> CRM[Private authenticated CRM API]
   Web --> Profile[Private profile API]
   Profile --> Folder[Local profile SQLite and documents]
+  CRM --> Ollama[Private local Qwen assistant]
+  CRM --> Preview[Immutable reviewed action previews]
+  Preview --> Workers[n8n confirmed action workers]
+  Workers --> Gmail
+  Workers --> Calendar[Google Calendar API]
+  Calendar --> N8N
   CRM --> Postgres[PostgreSQL career and n8n schemas]
   Operator[Local operator] --> N8N[n8n localhost:5678]
   Schedule[Five-minute schedules] --> N8N
@@ -27,3 +33,7 @@ Authenticated review decisions lock and version-check the message and applicatio
 Actions are separate persisted records with optional Manila due dates and revision checks. Completion adds history without changing an application stage. The Connections screen reads completion timestamps, published-workflow state and delivery failures from the same API.
 
 Private backups capture PostgreSQL, the profile SQLite/file folder, n8n state, synthetic engine data and the original environment keys while writers are stopped. Isolated restore verification compares counts and checks document integrity. Public release artifacts contain only source, built client assets and sanitized evidence.
+
+## Workspace 1.1
+
+Original confirmation timestamps supply submission dates independently of later stage changes. Linked email text, searchable descriptions, profile photos and calendar records are served through authenticated routes. Worker 09 imports a complete bounded Calendar window before claiming confirmed bookings; worker 08 claims only the connected Gmail account's confirmed replies. Booking retries reuse event IDs. Uncertain email sends stop for review. Ollama receives bounded local context and can return only information/proposals; it cannot call the confirmation endpoint.

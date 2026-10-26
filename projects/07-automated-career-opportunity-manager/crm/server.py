@@ -6,8 +6,9 @@ import psycopg
 from psycopg.types.json import Jsonb
 from crm.classifier import classify_live,decide_live,PARSER_VERSION
 from crm.sync import labels_for,queue_application,select_messages,claim_jobs,finish_job,require_recent
-from datetime import datetime,timezone
-from crm import workspace
+from datetime import datetime,timezone,date,timedelta
+from urllib.parse import urlparse,unquote
+from crm import workspace,organizer,assistant
 
 STAGES={'submitted','reviewing','information','assessment','interview','offer','accepted','hired','rejected','withdrawn','closed'}
 def now():return datetime.now(timezone.utc).isoformat()
@@ -19,6 +20,10 @@ def view(db):
  result=[]
  for key,data,version in db.execute('SELECT id,data,version FROM career.applications ORDER BY id'):
   data=dict(data,id=key,version=version)
+  confirmation=db.execute("SELECT min((envelope->>'received_at')::timestamptz) FROM career.messages WHERE result->>'application_id'=%s AND result->'classification'->>'stage'='submitted'",(key,)).fetchone()[0]
+  data['submitted_on']=data.get('submitted_on') or (confirmation.astimezone(timezone(timedelta(hours=8))).date().isoformat() if confirmation else None)
+  data['submitted_at']=confirmation.isoformat() if confirmation else None
+  data['job_description']=data.get('job_description','')
   data['events']=[r[0] for r in db.execute('SELECT data FROM career.events WHERE application_id=%s ORDER BY id DESC',(key,))]
   result.append(data)
  return result
@@ -28,6 +33,8 @@ def manual(db,m):
   if not isinstance(m.get(key),str) or not m[key].strip() or len(m[key])>300:raise ValueError('Required fields missing or too long')
  if m['stage'] not in STAGES:raise ValueError('Invalid stage')
  if m.get('nextAction') is not None and (not isinstance(m['nextAction'],str) or len(m['nextAction'])>300):raise ValueError('Invalid next action')
+ if m.get('submitted_on') and date.fromisoformat(m['submitted_on']).isoformat()!=m['submitted_on']:raise ValueError('Enter the submission date as YYYY-MM-DD')
+ if not isinstance(m.get('job_description',''),str) or len(m.get('job_description',''))>10000:raise ValueError('Job description is too long')
  locked(db)
  old=db.execute('SELECT data,version FROM career.applications WHERE id=%s',(m['id'],)).fetchone()
  if (old[1] if old else 0)!=m.get('version',0):raise LookupError('This application changed. Reload before editing again.')
@@ -37,6 +44,8 @@ def manual(db,m):
  elif old[0]['stage']!=m['stage']:changes.append('Manual stage change: '+old[0]['stage']+' -> '+m['stage'])
  if old and any(old[0].get(k)!=m.get(k) for k in ['company','role','source','nextAction']):changes.append('Application details or next action edited manually')
  for k in ['company','role','source','stage','nextAction']:data[k]=m.get(k)
+ for k in ['submitted_on','job_description']:
+  if k in m:data[k]=m[k]
  data.update(id=m['id'])
  if not old or old[0]['role']!=m['role']:data['original_role']=m['role']
  if not old or old[0]['stage']!=m['stage']:data['last_event']=now()
@@ -92,7 +101,8 @@ class Handler(BaseHTTPRequestHandler):
     body={}
     if post:
      length=int(self.headers.get('Content-Length','0'))
-     if not 0<length<=100000:raise ValueError('Invalid body size')
+     limit=10_000_000 if self.path=='/internal/calendar/import' else 100000
+     if not 0<length<=limit:raise ValueError('Invalid body size')
      body=json.loads(self.rfile.read(length))
      if not isinstance(body,dict):raise ValueError('Expected JSON object')
     worker=self.path.startswith('/internal/')
@@ -106,6 +116,15 @@ class Handler(BaseHTTPRequestHandler):
       token=secrets.token_urlsafe(32);db.execute('INSERT INTO career.sessions VALUES (%s,%s)',(hashlib.sha256(token.encode()).hexdigest(),time.time()+43200))
       return self.send(200,{'ok':True},'career_session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200')
      if not self.authorized(db):return self.send(401,{'error':'Sign in to the local workspace'})
+    if self.path=='/api/crm/assistant/status' and not post:return self.send(200,assistant.status())
+    if self.path=='/api/crm/assistant/chat' and post:return self.send(200,assistant.chat(db,body))
+    if self.path=='/api/crm/calendar' and not post:return self.send(200,organizer.calendar(db))
+    if self.path=='/api/crm/actions' and not post:return self.send(200,organizer.actions(db))
+    if self.path=='/api/crm/actions/preview' and post:return self.send(200,organizer.preview(db,body))
+    if self.path=='/api/crm/actions/confirm' and post:return self.send(200,organizer.confirm(db,body))
+    if self.path=='/internal/actions/claim' and post:return self.send(200,organizer.claim(db,body['kind'],body.get('account')))
+    if self.path=='/internal/actions/result' and post:return self.send(200,organizer.finish(db,body))
+    if self.path=='/internal/calendar/import' and post:return self.send(200,organizer.import_calendar(db,body))
     if self.path=='/api/crm/auth':return self.send(200,{'ok':True})
     if self.path=='/api/crm/logout' and post:
      cookie=SimpleCookie();cookie.load(self.headers.get('Cookie',''))
@@ -115,6 +134,7 @@ class Handler(BaseHTTPRequestHandler):
     if self.path=='/api/crm/tasks':return self.send(200,workspace.save_task(db,body) if post else workspace.tasks(db))
     if self.path=='/api/crm/deliveries' and not post:return self.send(200,workspace.deliveries(db))
     if self.path=='/api/crm/deliveries/retry' and post:return self.send(200,workspace.retry_delivery(db,body))
+    if self.path.startswith('/api/crm/application-emails/') and not post:return self.send(200,workspace.application_emails(db,unquote(self.path.split('/')[-1])))
     if self.path=='/api/crm/applications':return self.send(200,manual(db,body) if post else {'applications':view(db)})
     if self.path=='/internal/ingest' and post:return self.send(200,ingest(db,body))
     if self.path=='/internal/gmail-ingest' and post:

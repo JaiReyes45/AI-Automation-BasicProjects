@@ -23,3 +23,23 @@ String actionError(Object error) {
       ? 'Cannot reach local storage. Check Docker, then try again. Your entries are still here.'
       : '$message Refresh if this item changed; your entries are still here.';
 }
+
+String calendarDate(String value) {
+  final d = DateTime.tryParse(value);
+  if (d == null) return 'Date unknown';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[d.month - 1]} ${d.day}, ${d.year}';
+}

@@ -1,0 +1,345 @@
+{
+  "id": "project07ApprovedReplies",
+  "name": "Project 07 - 08 Send confirmed replies",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Execute manually",
+      "name": "Execute manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "parameters": {},
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "id": "Connected Gmail",
+      "name": "Connected Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "position": [
+        230,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Claim approved replies",
+      "name": "Claim approved replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "http://crm:8780/internal/actions/claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 25000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({kind:\"reply\",account:$json.emailAddress}) }}"
+      },
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Reply jobs",
+      "name": "Reply jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return ($json.jobs||[]).map(json=>({json}));",
+        "mode": "runOnceForAllItems"
+      },
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "id": "Original headers",
+      "name": "Original headers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "={{ \"https://gmail.googleapis.com/gmail/v1/users/me/messages/\"+encodeURIComponent($json.message_id)+\"?format=metadata&metadataHeaders=Message-ID\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "position": [
+        920,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Prepare reply",
+      "name": "Prepare reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const plan=$('Reply jobs').item.json;\nconst headers=$json.payload?.headers||[];const original=headers.find(h=>h.name.toLowerCase()==='message-id')?.value?.replace(/[\\r\\n]/g,'');\nconst subject='=?UTF-8?B?'+Buffer.from(plan.subject).toString('base64')+'?=';\nconst lines=['To: '+plan.to,'Subject: '+subject,'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64'];\nif(original){lines.push('In-Reply-To: '+original,'References: '+original);}\nlines.push('',Buffer.from(plan.body).toString('base64'));\nreturn {json:{...plan,raw:Buffer.from(lines.join('\\r\\n')).toString('base64url')}};",
+        "mode": "runOnceForEachItem"
+      },
+      "position": [
+        1150,
+        300
+      ]
+    },
+    {
+      "id": "Send confirmed reply",
+      "name": "Send confirmed reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({raw:$json.raw,threadId:$json.thread_id}) }}"
+      },
+      "position": [
+        1380,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GAol03INdoc1aOgm",
+          "name": "Gmail account"
+        }
+      },
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Reply outcome",
+      "name": "Reply outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const p=$('Prepare reply').item.json;const s=$json.statusCode||0;const ok=s>=200&&s<300&&!!$json.body?.id;return {json:{id:p.id,lease:p.lease,ok,external_id:$json.body?.id,uncertain:!s||s>=500||(s>=200&&s<300&&!ok),error:'Gmail delivery returned '+s+'. Check Sent before composing another reply.'}};",
+        "mode": "runOnceForEachItem"
+      },
+      "position": [
+        1610,
+        300
+      ]
+    },
+    {
+      "id": "Record reply outcome",
+      "name": "Record reply outcome",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "http://crm:8780/internal/actions/result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 25000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "position": [
+        1840,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Scheduled worker",
+      "name": "Scheduled worker",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "position": [
+        0,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "Execute manually": {
+      "main": [
+        [
+          {
+            "node": "Connected Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connected Gmail": {
+      "main": [
+        [
+          {
+            "node": "Claim approved replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim approved replies": {
+      "main": [
+        [
+          {
+            "node": "Reply jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply jobs": {
+      "main": [
+        [
+          {
+            "node": "Original headers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Original headers": {
+      "main": [
+        [
+          {
+            "node": "Prepare reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare reply": {
+      "main": [
+        [
+          {
+            "node": "Send confirmed reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send confirmed reply": {
+      "main": [
+        [
+          {
+            "node": "Reply outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply outcome": {
+      "main": [
+        [
+          {
+            "node": "Record reply outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduled worker": {
+      "main": [
+        [
+          {
+            "node": "Connected Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Manila",
+    "executionTimeout": 240,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

@@ -3,12 +3,15 @@
   "isolated_postgres_restore": "passed",
   "profile_integrity": "passed",
   "counts": {
-    "applications": 3,
-    "messages": 104,
-    "events": 3,
-    "credentials": 2,
-    "workflows": 7,
+    "applications": 5,
+    "messages": 106,
+    "events": 5,
+    "credentials": 3,
+    "workflows": 9,
     "tasks": 0,
-    "audit": 0
+    "audit": 0,
+    "calendar_events": 56,
+    "calendar_connection": 1,
+    "actions": 0
   }
 }

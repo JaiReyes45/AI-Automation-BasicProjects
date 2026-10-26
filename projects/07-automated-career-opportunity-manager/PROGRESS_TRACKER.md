@@ -254,3 +254,44 @@ Do not mark a milestone complete based only on generated code or elapsed time.
 - Added a 30-second foreground refresh, tab-resume refresh, request overlap protection, edit/profile protection and a visible connection error state.
 - Parser tests: 38 passed. Exported MIME normalizer passed. Flutter: 22 passed and analysis clean. CRM auth/persistence/retry/review integration suites passed.
 - Deployed browser shows five applications and the live-refresh status. Repeated intake imported zero messages; all nineteen eligible Gmail label jobs are verified delivered. No genuine review decisions were forced and no email was sent or deleted.
+
+### October 26 - D6 unified workspace sprint started
+
+User requested date sorting/filtering, job-description search, a distinctive workspace redesign, top-right profile/photo/editing, email detail from pipeline records, an assistant and an interview calendar. Selected local Ollama in Docker and Google Calendar integration.
+
+- D6.1: stable submission dates, search/filter/sort and linked email detail.
+- D6.2: refreshed workspace, top-right profile menu, photo and saved/edit profile views.
+- D6.3: interview calendar and Google Calendar connection/sync.
+- D6.4: local assistant with reviewed application edits, reply drafts and meeting actions.
+- D6.5: regression, responsive/browser and live integration verification; updated release documentation.
+
+External sends and calendar invitations require explicit in-app confirmation of a preview. Google OAuth completion depends on the user signing into the intended account; secrets stay in n8n.
+
+### October 26 - D6 implementation checkpoint
+
+- D6.1 data and D6.4 action services pass rollback-only integration checks: original submission dates in Manila, descriptions, linked email text, preview/confirmation, account isolation, duplicate protection and calendar collisions.
+- Private pre-deployment backup verified through isolated PostgreSQL restore: five applications and 106 messages preserved. Updated CRM and profile Docker services are healthy.
+- Profile photos are locally stored, resized and stripped of metadata. Calendar and reply workflows imported inactive pending live read checks.
+- Duolingo-inspired journey navigation uses the existing palette and actual stage counts. Responsive calendar and date-picker regression fixes are in progress; website deployment follows full verification.
+
+### October 26 - D6.1–D6.4 implementation milestones reached
+
+- Search by company, role and description, inclusive submission-date filtering, newest/oldest ordering and linked email reading pass widget checks.
+- Profile menu, saved/edit/document tabs and photo upload are implemented. Isolated upload test confirms resize, JPEG conversion, rejected invalid content and persistence across restart.
+- Google Calendar read/sync succeeded with the connected credential; Calendar and confirmed-reply workers are published. Their live checks had empty action queues and sent no email or invitation.
+- Local Qwen responds with the verified five-application count after bounding imported Calendar context. The first model load timed out; the warm bounded query completed in under two seconds. Review generated text and every proposed action.
+- All 27 Flutter tests pass, including 375 px, landscape, 2× text and reduced motion. D6.5 browser verification and delivery documentation continue.
+
+### October 26 - D6.5 verification milestone reached
+
+- Deployed the Duolingo-inspired interface with the existing green/charcoal/cream palette. Journey stage counts, company search and real email panels were checked in the browser; the mobile avatar menu opens Profile/Edit details/Documents.
+- Fixed stale icon fonts using content-based filenames so existing browsers receive the new glyphs on reload.
+- Final checks: clean Flutter analysis, 27 Flutter tests, 38 parser tests, four CRM suites, reply MIME checks and isolated photo/document persistence checks.
+- Google Calendar reading and local assistant response verified; all four runtime schedules active. No test email or invitation sent. See docs/workspace-1.1-verification.md for the acceptance boundary.
+- Final private backup/release packaging and GitHub publication are the remaining delivery steps.
+
+### October 26 - D6 local release milestone complete
+
+- Final private backup passed checksums, isolated PostgreSQL restore and profile integrity. It contains five applications, 106 messages, 56 calendar events, nine workflows and three encrypted credentials; action/audit tables are empty after rollback-only tests.
+- Public release 1.1.0 packages source, the production web client, versioned fonts and the updated user/setup/verification guides. Private runtime data and screenshots remain excluded.
+- Sources retain the portfolio layout under projects/07-automated-career-opportunity-manager. GitHub publication accompanies this delivery; live reply/invitation and genuine employer follow-up checks retain the explicit acceptance boundary above.
