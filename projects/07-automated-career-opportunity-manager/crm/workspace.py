@@ -37,7 +37,7 @@ def reviews(db):
         ORDER BY m.envelope->>'received_at' DESC""").fetchall()
     return {'items': [dict(account=a,id=i,revision=v,subject=m.get('subject','No subject'),
         sender=m.get('sender','Unknown sender'),received_at=m['received_at'],
-        body=current_text(m['body'])[:8000],result=r) for a,i,m,r,v in rows]}
+        body=current_text(m.get('html_text') or m['body'])[:8000],result=r) for a,i,m,r,v in rows]}
 
 
 def resolve(db, body):

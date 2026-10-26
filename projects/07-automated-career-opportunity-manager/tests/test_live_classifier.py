@@ -67,3 +67,28 @@ class ExpandedProviderTests(unittest.TestCase):
  def test_recommendation_footer_does_not_hide_status_notice(self):
   r=classify_live(self.message('It appears your application is unlikely to progress further. Similar jobs you might like.',subject='Application update'))
   self.assertNotEqual(r['reason'],'opportunity_only')
+
+
+class IndeedMultipartTests(unittest.TestCase):
+ message = ExpandedProviderTests.message
+ def confirmed(self):
+  m=self.message('Your application has been submitted. Good luck!',sender='indeedapply@indeed.com',subject='Indeed Application: Software Developer Intern')
+  m['html_text']='Application submitted Software Developer Intern Example Labs Inc. - City The following items were sent to Example Labs Inc.. Good luck!'
+  return m
+ def test_html_company_enables_confirmation(self):
+  from crm.classifier import decide_live
+  m=self.confirmed();r=classify_live(m)
+  self.assertEqual(r['company'],'Example Labs Inc.')
+  self.assertEqual(r['normalized_role'],'Software Engineer Intern')
+  self.assertEqual(decide_live(m,r,[])[1],'create')
+ def test_html_requires_matching_title_and_trusted_sender(self):
+  for field,value in [('sender','indeed@evil.test'),('html_text','Application submitted IT Intern The following items were sent to Example Labs Inc.. Good luck!')]:
+   m=self.confirmed();m[field]=value
+   self.assertIsNone(classify_live(m)['company'])
+ def test_repeat_matches_but_other_employer_in_shared_thread_splits(self):
+  from crm.classifier import decide_live
+  m=self.confirmed();r=classify_live(m)
+  app=dict(id='existing',account=m['account'],threads=[m['thread_id']],company=r['company'],original_role=r['original_role'],reference=r['reference'],stage='submitted',last_event=m['received_at'])
+  self.assertEqual(decide_live(m,r,[app])[1],'update')
+  m['html_text']=m['html_text'].replace('Example Labs Inc.','Example Two')
+  self.assertEqual(decide_live(m,classify_live(m),[app])[1],'create')

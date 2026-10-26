@@ -6,7 +6,7 @@ abstract class WorkspaceRepository extends ApplicationRepository {
   List<Map<String, dynamic>> get tasks;
   List<Map<String, dynamic>> get deliveries;
   Map<String, int> get versions;
-  Future<void> load();
+  Future<void> load({bool Function()? acceptResult});
   Future<void> resolveReview(Map<String, dynamic> body);
   Future<void> saveTask(Map<String, dynamic> body);
   Future<void> retryDelivery(Map<String, dynamic> body);

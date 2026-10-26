@@ -74,12 +74,15 @@ listing['parameters']['options']['pagination']={'pagination':{
     'parameters':{'parameters':[{'type':'qs','name':'pageToken','value':'={{ $response.body.nextPageToken || "" }}'}]},
     'paginationCompleteWhen':'other','completeExpression':'={{ !$response.body.nextPageToken }}',
     'limitPagesFetched':True,'maxRequests':20,'requestInterval':750}}
-normalize=r"""const m=$json;const parts=[];
+normalize=r"""const m=$json;let parts=[];
 function visit(p,type){if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}
-visit(m.payload,'text/plain');if(!parts.length)visit(m.payload,'text/html');
+visit(m.payload,'text/plain');const plain=parts.join('\n');parts=[];visit(m.payload,'text/html');
+const html=parts.join('\n').replace(/<!--[\s\S]*?-->/g,' ').replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ');
+const named={nbsp:' ',zwnj:'',zwj:'',amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",bull:' '};
+const htmlText=html.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(all,key)=>{if(key[0]==='#'){const n=parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';}return named[key.toLowerCase()]??all;}).replace(/\s+/g,' ').trim();
 const headers=m.payload.headers||[];const header=n=>headers.find(h=>h.name.toLowerCase()===n)?.value||'';
 return {json:{account:$('Gmail account').first().json.emailAddress,id:m.id,thread_id:m.threadId,
-received_at:new Date(Number(m.internalDate)).toISOString(),body:(parts.join('\n')||'[No text body]').slice(0,75000),
+received_at:new Date(Number(m.internalDate)).toISOString(),body:(plain||htmlText||'[No text body]').slice(0,45000),html_text:htmlText.slice(0,20000),
 subject:header('subject'),sender:header('from')}};"""
 nodes=[manual(), http('Gmail account','https://gmail.googleapis.com/gmail/v1/users/me/profile',google=True),
  http('Record connection','http://crm:8780/internal/connection','={{ JSON.stringify({account:$json.emailAddress}) }}'),

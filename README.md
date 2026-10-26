@@ -25,7 +25,7 @@ workflow export, and documented controlled-demo results.
 | 04 — Helpdesk Ticket Triage and SLA Router | Featured; controlled demo verified | Idempotency, AI safety guardrails, routing, outbox delivery, human review, and SLA operations | [Project README](projects/04-local-ai-helpdesk-ticket-triage/README.md) |
 | 05 — AI Lead-to-CRM Automation | In progress | Requirements, data contract, scoring model, and implementation plan for a CRM workflow | [Project README](projects/05-ai-lead-crm-automation/README.md) |
 | 06 — AI Telegram Pre-Sales Assistant | Implemented; acceptance testing in progress | Stateful discovery, local AI extraction, deterministic estimates, consent, and durable Telegram delivery | [Project README](projects/06-ai-telegram-presales-assistant/README.md) |
-| 07 — Automated Career Opportunity Manager | Local hand-off 1.0.0; genuine follow-up field acceptance open | Persistent Flutter CRM, review/actions, profile storage, scheduled Gmail labels and verified backup restore | [Project README](projects/07-automated-career-opportunity-manager/README.md) |
+| 07 — Automated Career Opportunity Manager | Local hand-off 1.0.1; genuine follow-up field acceptance open | Persistent Flutter CRM, review/actions, profile storage, scheduled Gmail labels and verified backup restore | [Project README](projects/07-automated-career-opportunity-manager/README.md) |
 
 ## What this portfolio emphasizes
 

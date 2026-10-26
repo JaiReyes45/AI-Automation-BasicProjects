@@ -38,7 +38,7 @@ class PersistentApplicationRepository extends WorkspaceRepository {
   }
 
   @override
-  Future<void> load() async {
+  Future<void> load({bool Function()? acceptResult}) async {
     final results = await Future.wait([
       for (final path in [
         'applications',
@@ -49,6 +49,7 @@ class PersistentApplicationRepository extends WorkspaceRepository {
       ])
         profileRequest('GET', '/api/crm/$path', ''),
     ]);
+    if (acceptResult != null && !acceptResult()) return;
     accept(results[0]);
     connection = jsonDecode(results[1]);
     List<Map<String, dynamic>> items(String raw) =>

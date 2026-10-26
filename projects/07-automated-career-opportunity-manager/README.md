@@ -5,11 +5,11 @@ n8n, Python, and Docker.
 
 ## Status
 
-**Local client hand-off release 1.0.0.** Reviewed: 2026-10-25.
+**Local client hand-off release 1.0.1.** Reviewed: 2026-10-26.
 
 Application CRM, review decisions, dated actions, profile/document storage, scheduled
 Gmail intake and label recovery are implemented. Start with [HANDOFF.md](HANDOFF.md).
-The release has 20 passing Flutter tests and 35 engine/provider tests, API acceptance
+The release has 22 passing Flutter tests and 38 engine/provider tests, API acceptance
 checks and a verified isolated backup restore. Genuine employer follow-up progression
 remains a field-acceptance item; controlled submission-to-hired progression passes.
 
@@ -108,3 +108,7 @@ Compose file and environment file, as documented. Recorded n8n results are in
 - Document deletion/version management and document parsing are outside this release. Review and retry controls are implemented.
 - Syncing requires Docker/n8n running; OAuth credentials can require reconnection. See [Day 3 operations](docs/d3-integration.md).
 - Local secrets, profile records, uploads, databases and generated builds are ignored.
+
+## October 26 sync fix
+
+The live view now refreshes saved data every 30 seconds and when the tab resumes, with edit protection and visible connection errors. Indeed multipart confirmations retain HTML text as well as the plain part; verified employer/title evidence can create an application without guessing. Reprocessing the authorized seven-day window recovered two confirmed applications, bringing the verified total to five. Messages without sufficient identity still remain in review.

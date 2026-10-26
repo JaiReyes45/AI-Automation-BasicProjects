@@ -1,13 +1,13 @@
 # CareerFlow â€” progress tracker
 
-Last updated: October 25, 2026 (Asia/Manila).
+Last updated: October 26, 2026 (Asia/Manila).
 
 ## Current checkpoint
 
 - **Completed:** D1.1, D1.2 interactive session preview, UI refinement, local Docker deployment, D2.1 classification/matching, and D2.2 orchestration for synthetic data.
 - **Current status:** D4.1/D4.2 and D5.1/D5.2 complete for local hand-off release 1.0.0. D3.2 genuine follow-up field acceptance remains open.
 - **Next:** Use the review inbox for ambiguous emails; observe the next safely matched genuine employer follow-up. No additional infrastructure is required for the delivered local scope.
-- **Gmail connection:** OAuth connected. Five-minute intake and label reconciliation are published and automatically verified; 17 messages checked, 3 confirmed applications, 11 review items.
+- **Gmail connection:** OAuth connected. Five-minute intake and reconciliation active; five confirmed applications, eleven review items and nineteen verified eligible label deliveries after the October 26 patch.
 - **Local URLs:** Web http://localhost:8087; n8n http://localhost:5678.
 - **Runtime:** web, CRM, profile, n8n, PostgreSQL, and private engine under project07-automated-career-opportunity-manager.
 - **Database distinction:** PostgreSQL now stores the career schema and n8n state. Existing synthetic SQLite and local profile files remain separate and intact.
@@ -246,3 +246,11 @@ Do not mark a milestone complete based only on generated code or elapsed time.
 - Browser sign-out returned 401 for both CRM and profile routes; QA browser closed. Final clean backup verified and live services resumed.
 - Public workflow exports remain inactive with credential references only; runtime workflows 06/07 remain published. Real application and review records are preserved.
 - Local client hand-off scope complete. Original genuine follow-up acceptance remains open; no synthetic result is presented as a real employer progression. Future scope is listed in HANDOFF.md.
+
+### October 26 - Missing application and live-view fix
+
+- Diagnosed two independent issues: the browser required manual refresh, and Indeed's plain MIME part omitted employer details present in HTML. Scheduled intake itself was working after Docker resumed.
+- Preserved separate plain and sanitized HTML text, added conservative Indeed confirmation identity, and reprocessed only eligible messages in the seven-day window. Two confirmations recovered; five real applications now stored. Listing expiry remains review evidence, not a rejection or new submission.
+- Added a 30-second foreground refresh, tab-resume refresh, request overlap protection, edit/profile protection and a visible connection error state.
+- Parser tests: 38 passed. Exported MIME normalizer passed. Flutter: 22 passed and analysis clean. CRM auth/persistence/retry/review integration suites passed.
+- Deployed browser shows five applications and the live-refresh status. Repeated intake imported zero messages; all nineteen eligible Gmail label jobs are verified delivered. No genuine review decisions were forced and no email was sent or deleted.

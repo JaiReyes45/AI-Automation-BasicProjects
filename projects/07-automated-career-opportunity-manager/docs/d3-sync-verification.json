@@ -14,7 +14,7 @@
     "actions": {}
   },
   "intake": {
-    "checked_at": "2026-10-24T14:55:46.400273+00:00",
+    "checked_at": "2026-10-26T14:34:47.458370+00:00",
     "status": "success",
     "last_node": "Sync complete",
     "counts": {
@@ -27,22 +27,23 @@
       "Create label": 0
     },
     "actions": {},
-    "matched_messages": 17
+    "matched_messages": 16
   },
   "reconcile": {
-    "checked_at": "2026-10-24T14:55:07.657992+00:00",
+    "checked_at": "2026-10-26T14:33:09.719253+00:00",
     "status": "success",
     "last_node": "Record delivery",
     "counts": {
+      "Recent career messages": 0,
       "Collect pages": 0,
       "Message IDs": 0,
       "Store in CRM": 0,
-      "Label jobs": 15,
-      "Record delivery": 15,
+      "Label jobs": 13,
+      "Record delivery": 13,
       "Create label": 0
     },
     "actions": {},
-    "verified": 15
+    "verified": 13
   },
   "previous_runs": [
     {
@@ -59,6 +60,62 @@
       },
       "actions": {},
       "matched_messages": 17,
+      "workflow": "intake"
+    },
+    {
+      "checked_at": "2026-10-24T14:55:46.400273+00:00",
+      "status": "success",
+      "last_node": "Sync complete",
+      "counts": {
+        "Recent career messages": 2,
+        "Collect pages": 1,
+        "Message IDs": 0,
+        "Store in CRM": 0,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0
+      },
+      "actions": {},
+      "matched_messages": 17,
+      "workflow": "intake"
+    },
+    {
+      "checked_at": "2026-10-24T14:55:07.657992+00:00",
+      "status": "success",
+      "last_node": "Record delivery",
+      "counts": {
+        "Collect pages": 0,
+        "Message IDs": 0,
+        "Store in CRM": 0,
+        "Label jobs": 15,
+        "Record delivery": 15,
+        "Create label": 0
+      },
+      "actions": {},
+      "verified": 15,
+      "workflow": "reconcile"
+    },
+    {
+      "checked_at": "2026-10-26T14:32:45.988908+00:00",
+      "status": "success",
+      "last_node": "Sync complete",
+      "counts": {
+        "Recent career messages": 2,
+        "Collect pages": 1,
+        "Message IDs": 13,
+        "Store in CRM": 13,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0
+      },
+      "actions": {
+        "unmatched_application": 5,
+        "opportunity_only": 2,
+        "unrecognized_message": 3,
+        "create": 2,
+        "listing_expired_not_application_closed": 1
+      },
+      "matched_messages": 16,
       "workflow": "intake"
     }
   ]

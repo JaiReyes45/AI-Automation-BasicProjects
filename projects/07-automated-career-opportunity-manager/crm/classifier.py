@@ -4,7 +4,7 @@ import hashlib
 from email.utils import parseaddr
 from workflow.engine import classify, current_text, decide
 
-PARSER_VERSION = 4
+PARSER_VERSION = 5
 ROLE_LABELS = ['IT Intern', 'QA Engineer Intern', 'Software Engineer Intern',
                'Business Application Intern', 'Data Engineer Intern', 'Other Internship']
 
@@ -50,13 +50,25 @@ def classify_live(message):
                             normalized_role=normalized, original_role=role, company=company,
                             reference='jobstreet:' + hashlib.sha256((message['thread_id']+'\n'+company.casefold()+'\n'+role.casefold()).encode()).hexdigest(),
                             identity_kind='jobstreet_confirmation', deadline=None)
-    # A confirmation missing an employer/reference remains unmatched.
+    # Indeed's plain MIME part omits the employer present in its HTML version.
     if domain == 'indeed.com' or domain.endswith('.indeed.com'):
         if re.search(r'^Your application has been submitted\.', text, re.I):
             role = re.match(r'^Indeed Application:\s*(.{2,160})$', subject, re.I)
             result.update(stage='submitted', reason=None, evidence=['Your application has been submitted.'])
             if role:
-                result.update(original_role=role[1], normalized_role=normalize_role(role[1]))
+                original = role[1].strip()
+                normalized = normalize_role(original)
+                result.update(original_role=original, normalized_role=normalized)
+                html_text = re.sub(r'\s+', ' ', current_text(message.get('html_text', '')))
+                employer = re.search(r'The following items were sent to (.{2,180}?)\.\s+Good luck!', html_text, re.I)
+                title = re.search(r'Application submitted\s+'+re.escape(original)+r'(?=\s|$)', html_text, re.I)
+                if employer and title and normalized and message.get('thread_id'):
+                    prefix = html_text[max(0, employer.start()-35):employer.start()]
+                    if not re.search(r'\b(?:if|might|may|not)\b', prefix, re.I):
+                        company = employer[1].strip()
+                        result.update(company=company, identity_kind='indeed_confirmation',
+                            reference='indeed:' + hashlib.sha256((message['thread_id']+'\n'+company.casefold()+'\n'+original.casefold()).encode()).hexdigest(),
+                            evidence=['Your application has been submitted.', employer[0]])
             return result
     if domain == 'myworkday.com' or domain.endswith('.myworkday.com'):
         received = re.search(r'Thank you for applying for the role of (.{2,160}?)\s*\.', text, re.I)
@@ -84,9 +96,9 @@ def classify_live(message):
 
 
 def decide_live(message, result, applications):
-    # Gmail groups some different JobStreet confirmations into one conversation.
+    # Gmail can group different provider confirmations into one conversation.
     # Only an explicit submission with both identity fields can split that thread.
-    if result.get('identity_kind') == 'jobstreet_confirmation':
+    if result.get('identity_kind') in ('jobstreet_confirmation', 'indeed_confirmation'):
         matches = [a for a in applications if a['account'] == message['account']
                    and message.get('thread_id') in a.get('threads', [])
                    and a['company'].casefold() == result['company'].casefold()

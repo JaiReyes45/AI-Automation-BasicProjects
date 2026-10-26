@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:careerflow/main.dart';
@@ -49,7 +51,16 @@ class TestWorkspace extends WorkspaceRepository {
   Map<String, dynamic>? decision;
   bool fail = false;
   @override
-  Future<void> load() async {}
+  Future<void> load({bool Function()? acceptResult}) async {
+    loads++;
+    if (pendingLoad != null) await pendingLoad!.future;
+    if (fail) throw Exception('Unavailable');
+    if (acceptResult != null && !acceptResult()) return;
+    connection = {...connection, 'review_count': loads + 1};
+  }
+
+  int loads = 0;
+  Completer<void>? pendingLoad;
   @override
   Future<void> save(JobApplication a) => demo.save(a);
   @override
@@ -106,6 +117,7 @@ Future<void> launch(
     ),
   );
   await tester.pumpAndSettle();
+  addTearDown(() async => tester.pumpWidget(const SizedBox()));
 }
 
 Future<void> nav(WidgetTester tester, int index) async {
@@ -138,6 +150,57 @@ Future<void> tap(WidgetTester tester, String text) async {
 }
 
 void main() {
+  testWidgets('Live view refreshes without clicks and pauses for editing', (
+    tester,
+  ) async {
+    final repo = TestWorkspace();
+    await launch(tester, repo);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(repo.loads, 1);
+    expect(find.text('Review 2 messages'), findsOneWidget);
+    await nav(tester, 6);
+    await tester.tap(find.text('Add action'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Action title'),
+      'Keep my draft',
+    );
+    await tester.pump(const Duration(seconds: 30));
+    expect(repo.loads, 1);
+    expect(find.text('Keep my draft'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    repo.fail = true;
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Updates paused.'), findsOneWidget);
+    repo.fail = false;
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Updates paused.'), findsNothing);
+  });
+
+  testWidgets(
+    'Live refresh does not overlap or apply a response over an open editor',
+    (tester) async {
+      final repo = TestWorkspace()..pendingLoad = Completer<void>();
+      await launch(tester, repo);
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 30));
+      expect(repo.loads, 1);
+      await nav(tester, 6);
+      await tester.tap(find.text('Add action'));
+      await tester.pumpAndSettle();
+      repo.pendingLoad!.complete();
+      await tester.pumpAndSettle();
+      expect(repo.connection['review_count'], 1);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 60));
+      expect(repo.loads, 1);
+    },
+  );
+
   test('timestamps explicitly convert UTC to Manila', () {
     expect(manilaTime('2026-10-24T16:30:00Z'), '2026-10-25 00:30 Manila');
     expect(manilaTime(null), 'Never');

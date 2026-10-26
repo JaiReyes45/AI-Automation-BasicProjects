@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/application_repository.dart';
@@ -17,9 +19,63 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int selected = 0;
   bool refreshing = false;
+  Timer? refreshTimer;
+  bool foreground = true;
+  String? refreshError;
+
+  bool get canAutoRefresh =>
+      mounted &&
+      foreground &&
+      selected != 4 &&
+      ModalRoute.of(context)?.isCurrent == true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.repository is WorkspaceRepository) {
+      refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (canAutoRefresh) refreshWorkspace();
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (canAutoRefresh) refreshWorkspace();
+  }
+
+  Future<void> refreshWorkspace() async {
+    if (refreshing || widget.repository is! WorkspaceRepository) return;
+    setState(() => refreshing = true);
+    try {
+      await (widget.repository as WorkspaceRepository).load(
+        acceptResult: () => canAutoRefresh,
+      );
+      if (mounted) setState(() => refreshError = null);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => refreshError =
+              'Updates paused. Check Docker or reload to sign in again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => refreshing = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   static const titles = [
     'Overview',
     'Applications',
@@ -102,37 +158,25 @@ class _AppShellState extends State<AppShell> {
                                 child: TextButton.icon(
                                   onPressed: refreshing
                                       ? null
-                                      : () async {
-                                          setState(() => refreshing = true);
-                                          try {
-                                            await (widget.repository
-                                                    as WorkspaceRepository)
-                                                .load();
-                                            if (mounted) setState(() {});
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Refresh failed. Check your connection or sign in again by reloading the page.',
-                                                      ),
-                                                    ),
-                                                  );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => refreshing = false,
-                                              );
-                                            }
-                                          }
-                                        },
+                                      : refreshWorkspace,
                                   icon: const Icon(Icons.refresh),
                                   label: Text(
                                     refreshing
                                         ? 'Refreshing…'
                                         : 'Refresh workspace',
+                                  ),
+                                ),
+                              ),
+                            if (widget.repository is WorkspaceRepository)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  refreshError ?? 'Live view · refreshes every 30 seconds. Gmail checks every 5 minutes while Docker is running.',
+                                  style: TextStyle(
+                                    color: refreshError == null
+                                        ? muted
+                                        : Colors.red.shade800,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),

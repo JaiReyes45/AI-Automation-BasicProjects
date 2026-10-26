@@ -1,4 +1,4 @@
-# CareerFlow local hand-off — 1.0.0
+# CareerFlow local hand-off — 1.0.1
 
 Delivered October 25, 2026 for one user on a trusted Windows/WSL Docker device.
 
@@ -43,3 +43,7 @@ The seven-day subject filter cannot discover every possible employer email. The 
 - Private backups stay in `.runtime/backups` on the current device. Transfer them separately through a private channel only when migrating the same user's workspace.
 - A new user's installation must generate its own settings and connect its own Gmail account.
 - Preserve the original encryption key when restoring this workspace. A source checkout alone cannot recover its credentials or data.
+
+## Patch 1.0.1 — October 26
+
+Automatic workspace refresh and Indeed HTML confirmation parsing are deployed. Two real confirmations were recovered (five total applications). Current regression totals: 22 Flutter tests, 38 parser/engine tests, exported MIME-normalizer check and CRM integration checks. The original release's genuine follow-up progression caveat remains unchanged.

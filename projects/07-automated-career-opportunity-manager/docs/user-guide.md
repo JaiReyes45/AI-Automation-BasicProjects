@@ -6,7 +6,7 @@ Open CareerFlow and sign in with the local workspace password. Applications can 
 
 The usual path is submitted → reviewing → information requested → assessment/interview → offer → accepted → hired. Employers may skip stages. Rejected and withdrawn are terminal outcomes; no response or an expired job listing alone is not a rejection. Confirm acceptance or hiring only when supported by evidence.
 
-Refresh workspace after a background sync or changes from another tab. If a stale-edit message appears, refresh and review the new record before retrying; the app does not silently overwrite it.
+The open workspace checks saved data every 30 seconds and refreshes when you return to the tab. Gmail intake runs separately every five minutes while Docker is running. Background screen updates pause while you edit a record or profile. You can also use Refresh workspace. If a stale-edit message appears, refresh and review the new record before retrying; the app does not silently overwrite it.
 
 ## Review inbox
 

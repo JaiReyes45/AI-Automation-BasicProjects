@@ -64,7 +64,7 @@ def ingest(db,m):
  labels=['Career/System/Needs Review']
  if app:labels=labels_for(app)
  if action=='opportunity_only':labels=['Career/Stage/Opportunity Discovered']
- db.execute('INSERT INTO career.messages(account,id,envelope,result) VALUES (%s,%s,%s,%s) ON CONFLICT(account,id) DO UPDATE SET result=EXCLUDED.result,revision=career.messages.revision+1',(m['account'],m['id'],Jsonb(m),Jsonb(outcome)))
+ db.execute('INSERT INTO career.messages(account,id,envelope,result) VALUES (%s,%s,%s,%s) ON CONFLICT(account,id) DO UPDATE SET envelope=EXCLUDED.envelope,result=EXCLUDED.result,revision=career.messages.revision+1',(m['account'],m['id'],Jsonb(m),Jsonb(outcome)))
  db.execute("INSERT INTO career.label_jobs(account,message_id,application_id,labels,eligible) VALUES (%s,%s,%s,%s,true) ON CONFLICT(account,message_id) DO UPDATE SET application_id=EXCLUDED.application_id,labels=EXCLUDED.labels,state='pending',eligible=true,generation=career.label_jobs.generation+1,attempts=0,next_attempt=0,error=NULL",(m['account'],m['id'],outcome['application_id'],Jsonb(labels)))
  return outcome
 
