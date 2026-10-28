@@ -5,7 +5,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-IDS = {'labels':'project07GmailLabels', 'intake':'project07GmailSync', 'reconcile':'project07GmailReconcile'}
+IDS = {'labels':'project07GmailLabels', 'intake':'project07GmailSync', 'reconcile':'project07GmailReconcile', 'calendar':'project07Calendar'}
 parser=argparse.ArgumentParser()
 parser.add_argument('--workflow', choices=IDS, default='intake')
 args=parser.parse_args()
@@ -20,12 +20,13 @@ result=x['data']['resultData']
 runs=result.get('runData',{})
 summary={'checked_at':datetime.now(timezone.utc).isoformat(),'status':x.get('status'),
          'last_node':result.get('lastNodeExecuted'),'counts':{},'actions':{}}
-for name in ['Recent career messages','Collect pages','Message IDs','Store in CRM','Label jobs','Record delivery','Create label']:
+for name in ['Fetch mailbox page','Message IDs','Store in CRM','Label jobs','Record delivery','Create label','Meeting jobs','Record meeting outcome']:
     summary['counts'][name]=sum(len(items) for run in runs.get(name,[]) for items in run.get('data',{}).get('main',[]) if items)
 for run in runs.get('Store in CRM',[]):
     for items in run.get('data',{}).get('main',[]):
         for item in items or []:
-            action=item.get('json',{}).get('action','unknown')
+            payload=item.get('json',{})
+            action=payload.get('body',payload).get('action','unknown')
             summary['actions'][action]=summary['actions'].get(action,0)+1
 for name in ['Verify delivery','Select unprocessed']:
     for run in runs.get(name,[]):
@@ -39,6 +40,13 @@ for name in ['Verify delivery','Select unprocessed']:
                     summary[category]=summary.get(category,0)+1
 if result.get('error'):
     summary['error_type']=result['error'].get('name','unknown')
+for name in ['Finish mailbox page','Record mailbox failure']:
+    for run in runs.get(name,[]):
+        for items in run.get('data',{}).get('main',[]):
+            for item in items or []:
+                data=item.get('json',{})
+                summary['capture']={k:data.get(k) for k in ['complete','processed','reason']}
+                summary['coverage']={k:data.get('coverage',{}).get(k) for k in ['status','complete_from','complete_through','last_error']}
 path=Path(__file__).resolve().parents[1]/'docs/d3-sync-verification.json'
 report=json.loads(path.read_text()) if path.exists() else {}
 if args.workflow in report:

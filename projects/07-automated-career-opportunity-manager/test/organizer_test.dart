@@ -124,14 +124,15 @@ void main() {
     expect(order().single, contains('older'));
   });
 
-  testWidgets('Journey opens the matching stage and actual email content', (
+  testWidgets('Application stage filter opens actual email content', (
     tester,
   ) async {
     final repo = OrganizerWorkspace();
     await support.launch(tester, repo);
-    await tester.ensureVisible(find.byKey(const ValueKey('journey-interview')));
-    await tester.tap(find.byKey(const ValueKey('journey-interview')));
+    await support.nav(tester, 1);
+    await tester.tap(find.byType(DropdownButtonFormField<HiringStage>));
     await tester.pumpAndSettle();
+    await support.tap(tester, 'Interview');
     expect(find.text('Later Company'), findsOneWidget);
     expect(find.text('Earlier Company'), findsNothing);
     final row = find.byKey(const ValueKey('application-newer'));

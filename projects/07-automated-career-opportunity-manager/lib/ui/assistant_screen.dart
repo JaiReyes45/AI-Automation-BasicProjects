@@ -6,6 +6,9 @@ import 'application_workspace.dart';
 import 'app_shell.dart';
 import 'app_theme.dart';
 import 'workspace_format.dart';
+import 'today_screen.dart';
+import '../data/profile_stub.dart'
+    if (dart.library.js_interop) '../data/profile_web.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({
@@ -64,6 +67,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
             'text': result['answer'],
             'ids': result['application_ids'],
             'proposal': result['proposal'],
+            'sources': result['sources'],
+            'completeness': result['completeness'],
+            'coverage': result['coverage'],
           });
           input.clear();
         });
@@ -80,7 +86,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        'A little help, right here.',
+        'Workspace assistant',
         style: Theme.of(context).textTheme.headlineLarge,
       ),
       const SizedBox(height: 8),
@@ -149,9 +155,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
           runSpacing: 12,
           children: [
             for (final prompt in [
+              'Which employers are waiting for my response?',
+              'Find unmatched interview requests.',
+              'Draft a reply with my availability.',
               'Which applications did I submit this week?',
-              'Help me draft a follow-up reply.',
-              'Help me plan my next interview.',
             ])
               ActionChip(
                 label: Text(prompt),
@@ -174,7 +181,64 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SelectableText(message['text']),
+                SelectableText(
+                  message['text']?.toString() ?? 'No answer returned.',
+                ),
+                if (message['role'] == 'assistant') ...[
+                  const SizedBox(height: 12),
+                  if (message['completeness'] is Map)
+                    Text(
+                      'Evidence coverage: ${message['completeness']['records'] ?? '?'} of ${message['completeness']['total'] ?? '?'} relevant records${message['completeness']['limited'] == true ? ' · results limited' : ''}',
+                      style: const TextStyle(color: muted),
+                    )
+                  else
+                    const Text(
+                      'Retrieval completeness was not reported.',
+                      style: TextStyle(color: muted),
+                    ),
+                  if (workspaceItems(message['sources']).isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Sources used',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    for (final source in workspaceItems(message['sources']))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${source['label'] ?? source['id'] ?? 'Source'} · ${source['type'] ?? 'record'}',
+                            ),
+                            if (source['message_id'] != null &&
+                                source['account'] != null)
+                              TextButton.icon(
+                                onPressed: () => openDocument(
+                                  'https://mail.google.com/mail/u/?authuser=${Uri.encodeComponent(source['account'].toString())}#all/${Uri.encodeComponent(source['message_id'].toString())}',
+                                ),
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text('Open source email'),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ] else
+                    const Text(
+                      'No source references were returned.',
+                      style: TextStyle(color: muted),
+                    ),
+                  if (message['coverage'] is Map &&
+                      (message['coverage'] as Map).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: CoverageSummary(
+                        coverage: Map<String, dynamic>.from(
+                          message['coverage'],
+                        ),
+                      ),
+                    ),
+                ],
                 for (final id in message['ids'] ?? []) ...[
                   for (final a in widget.repository.applications.where(
                     (a) => a.id == id,

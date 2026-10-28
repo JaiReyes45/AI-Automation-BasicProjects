@@ -5,11 +5,12 @@ n8n, Python, and Docker.
 
 ## Status
 
-**Local client hand-off release 1.1.0.** Reviewed: 2026-10-26.
+**Local client hand-off release 1.1.0, with follow-through update.** Reviewed: 2026-10-28.
 
 Application CRM, review decisions, dated actions, profile/document storage, scheduled
 Gmail intake and label recovery are implemented, along with the [unified workspace](docs/workspace-1.1.md): submission dates, email details, profile photo, Google Calendar and local Ollama assistant. Start with [HANDOFF.md](HANDOFF.md).
-The release has 27 passing Flutter tests and 38 engine/provider tests, API acceptance
+The [follow-through update](docs/follow-through-guide.md) adds Today, evidence-linked employer requests, Windows alerts, resumable mailbox capture and private interview reminders.
+Verification includes 30 Flutter tests, 97 Python tests, workflow/API acceptance
 checks and a verified isolated backup restore. Genuine employer follow-up progression
 remains a field-acceptance item; controlled submission-to-hired progression passes.
 
@@ -75,7 +76,7 @@ See the [architecture diagram](diagrams/architecture.md).
 | 06 | Five-minute Gmail intake, pagination and duplicate filtering |
 | 07 | Five-minute Gmail label reconciliation and readback |
 | 08 | One-minute worker for explicitly confirmed Gmail replies |
-| 09 | Five-minute primary Calendar sync and explicitly confirmed meetings |
+| 09 | Five-minute primary Calendar sync, private interview holds and explicitly confirmed meetings |
 
 Exports contain synthetic examples, no execution data or secret values. Configure
 local credentials using the setup guide before running them.

@@ -120,9 +120,10 @@ def confirm(db, body):
         # Recheck clashes at confirmation, including another tab's new local event.
         check = preview(db, dict(data, kind='meeting'))
         db.execute('DELETE FROM career.actions WHERE id=%s AND state=%s', (check['id'], 'preview'))
-        event = dict(data, source='careerflow', status='confirmed', sync_state='queued', google_id=data['event_id'])
+        data.update(event_version=1, status='confirmed', operation='create')
+        event = dict(data, source='careerflow', status='confirmed', scheduling_state='confirmed', revision=1, sync_state='queued', google_id=data['event_id'])
         db.execute('INSERT INTO career.calendar_events VALUES (%s,%s,1)', (data['event_id'], Jsonb(event)))
-    db.execute('UPDATE career.actions SET state=%s WHERE id=%s', (state, body['id']))
+    db.execute('UPDATE career.actions SET state=%s,data=%s WHERE id=%s', (state, Jsonb(data), body['id']))
     audit(db, 'confirmed_action', dict(action_id=body['id'], kind=kind, application_id=app['id']))
     return {'ok': True, 'state': state}
 
@@ -142,11 +143,18 @@ def claim(db, kind, account=None):
     jobs = []
     for key, data, attempts in rows:
         if kind == 'meeting':
+            current = db.execute('SELECT data FROM career.calendar_events WHERE id=%s', (data['event_id'],)).fetchone()
+            if not current or current[0].get('revision', 1) != data.get('event_version', 1):
+                db.execute("UPDATE career.actions SET state='superseded' WHERE id=%s", (key,))
+                continue
+            connection = db.execute('SELECT data FROM career.calendar_connection WHERE id=1').fetchone()
+            if not connection or (datetime.now(timezone.utc)-stamp(connection[0]['last_sync'])).total_seconds()>900:
+                continue
             clashes=[event for other,event in db.execute("SELECT id,data FROM career.calendar_events WHERE COALESCE(data->>'status','') NOT IN ('cancelled','not_in_window')")
-                if other != data['event_id'] and stamp(data['start'])<stamp(event['end']) and stamp(data['end'])>stamp(event['start'])]
+                if data.get('status') != 'cancelled' and other != data['event_id'] and stamp(data['start'])<stamp(event['end']) and stamp(data['end'])>stamp(event['start'])]
             if clashes:
                 db.execute("UPDATE career.actions SET state='failed',data=data || %s WHERE id=%s",(Jsonb({'error':'A calendar conflict appeared before booking. Choose another time.'}),key))
-                db.execute("UPDATE career.calendar_events SET data=data || %s WHERE id=%s",(Jsonb({'status':'cancelled','sync_state':'failed','error':'Calendar conflict before booking.'}),data['event_id']))
+                db.execute("UPDATE career.calendar_events SET data=data || %s WHERE id=%s",(Jsonb({'sync_state':'conflict','error':'Calendar conflict before booking.'}),data['event_id']))
                 continue
         lease = uuid.uuid4().hex
         db.execute("UPDATE career.actions SET state='processing',lease=%s,lease_token=%s,attempts=attempts+1 WHERE id=%s", (time.time()+600, lease, key))
@@ -160,6 +168,11 @@ def finish(db, body):
     if not row or row[1] != 'processing' or body.get('lease') != row[3]:
         raise LookupError('This action lease is no longer current.')
     kind, _, data, _ = row
+    if kind == 'meeting':
+        current = db.execute('SELECT data FROM career.calendar_events WHERE id=%s', (data['event_id'],)).fetchone()
+        if not current or current[0].get('revision', 1) != data.get('event_version', 1):
+            db.execute("UPDATE career.actions SET state='superseded' WHERE id=%s", (body['id'],))
+            return {'ok': True, 'superseded': True}
     ok = body.get('ok') is True
     state = 'completed' if ok else ('uncertain' if kind == 'reply' and body.get('uncertain') else 'failed')
     data.update(completed_at=now() if ok else None, external_id=body.get('external_id'),
@@ -168,9 +181,9 @@ def finish(db, body):
     if kind == 'meeting':
         db.execute('UPDATE career.calendar_events SET data=data || %s,version=version+1 WHERE id=%s',
                    (Jsonb({'sync_state': 'synced' if ok else 'failed', 'error': data['error']}), data['event_id']))
-    if ok:
+    if ok and data.get('application_id'):
         db.execute('INSERT INTO career.events(application_id,data) VALUES (%s,%s)', (data['application_id'], Jsonb(dict(
-            description='Reply sent' if kind == 'reply' else 'Meeting added to Google Calendar', date=now(), source='confirmed_action'))))
+            description='Reply sent' if kind == 'reply' else 'Interview calendar updated', date=now(), source='confirmed_action'))))
     return {'ok': True}
 
 
@@ -194,15 +207,20 @@ def import_calendar(db, body):
         seen.append(key)
         owned = event.get('extendedProperties', {}).get('private', {}).get('careerflow_event')
         existing = db.execute('SELECT data FROM career.calendar_events WHERE id=%s', (owned or 'google-'+key,)).fetchone()
+        # Preserve newer local intent until its worker has acknowledged it.
+        if existing and existing[0].get('sync_state') in ('queued', 'conflict', 'failed'):
+            continue
         data = dict(existing[0] if existing else {}, title=event.get('summary', 'Untitled event'), start=a, end=b,
                     all_day=all_day, location=event.get('location', ''), description=event.get('description', ''),
                     attendees=[x['email'] for x in event.get('attendees', []) if x.get('email')],
                     source='careerflow' if owned and existing else 'google', status=event.get('status', 'confirmed'),
                     sync_state='synced', google_id=key, html_link=event.get('htmlLink'), updated=event.get('updated'))
+        if owned and existing:
+            data['scheduling_state'] = event.get('status', 'confirmed')
         db.execute('INSERT INTO career.calendar_events VALUES (%s,%s,1) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=career.calendar_events.version+1',
                    (owned if owned and existing else 'google-'+key, Jsonb(data)))
     if body.get('window_start') and body.get('window_end'):
         db.execute("UPDATE career.calendar_events SET data=data || %s WHERE data->>'sync_state'='synced' AND NOT (data->>'google_id'=ANY(%s)) AND (data->>'start')::timestamptz>%s AND (data->>'start')::timestamptz<%s",(Jsonb({'status':'not_in_window'}),seen,stamp(body['window_start'])+timedelta(minutes=1),stamp(body['window_end'])-timedelta(minutes=1)))
     db.execute('INSERT INTO career.calendar_connection VALUES (1,%s) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data',
-               (Jsonb({'connected': True, 'last_sync': now(), 'calendar_name': body.get('calendar_name', 'Primary calendar')}),))
+               (Jsonb({'connected': True, 'last_sync': now(), 'calendar_name': body.get('calendar_name', 'Primary calendar'), 'window_start':body.get('window_start'),'window_end':body.get('window_end')}),))
     return {'ok': True, 'processed': len(items)}

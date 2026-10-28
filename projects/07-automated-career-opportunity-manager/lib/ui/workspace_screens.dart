@@ -7,6 +7,8 @@ import '../domain/application.dart';
 import 'app_shell.dart';
 import 'app_theme.dart';
 import 'workspace_format.dart';
+import 'notification_settings.dart';
+import 'today_screen.dart';
 
 const categories = {
   'reply': 'Reply needed',
@@ -580,7 +582,7 @@ class _ActionsScreenState extends State<ActionsScreen> {
           runSpacing: 12,
           children: [
             FilledButton.icon(
-              onPressed: repo.applications.isEmpty ? null : () => edit(),
+              onPressed: () => edit(),
               icon: const Icon(Icons.add),
               label: const Text('Add action'),
             ),
@@ -637,13 +639,18 @@ class _ActionsScreenState extends State<ActionsScreen> {
                           .where((a) => a.id == t['application_id'])
                           .map((a) => '${a.company} · ${a.role}')
                           .firstOrNull ??
-                      'Application',
+                      'Application not matched',
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${categories[t['category']]} · ${t['due_on'] == null ? 'No deadline specified' : 'Due ${t['due_on']} (Manila)'}',
+                  '${t['actor'] == 'employer' ? 'Waiting on employer' : 'Your action'} · ${categories[t['category']] ?? 'Other'} · ${taskDeadline(t)}',
                   style: const TextStyle(color: muted),
                 ),
+                if (t['evidence'] is List && (t['evidence'] as List).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SelectableText((t['evidence'] as List).join('\n')),
+                  ),
                 if (t['status'] == 'open' &&
                     t['due_on'] != null &&
                     t['due_on'].toString().compareTo(manilaToday()) < 0)
@@ -697,13 +704,20 @@ class _ActionsScreenState extends State<ActionsScreen> {
           ),
           const SizedBox(height: 12),
           for (final a in suggestions)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(a.company),
-              subtitle: Text(a.role),
-              trailing: TextButton(
-                onPressed: () => edit(null, a.id),
-                child: const Text('Plan follow-up'),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${a.company} · ${a.role}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextButton(
+                    onPressed: () => edit(null, a.id),
+                    child: const Text('Plan follow-up'),
+                  ),
+                ],
               ),
             ),
         ],
@@ -765,6 +779,7 @@ class _TaskRecordState extends State<TaskRecord> {
     });
     try {
       await widget.repository.saveTask({
+        ...?widget.item,
         'id': taskId,
         'application_id': applicationId,
         'title': title.text.trim(),
@@ -813,6 +828,10 @@ class _TaskRecordState extends State<TaskRecord> {
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Application'),
                     items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Not matched yet'),
+                      ),
                       for (final a in widget.repository.applications)
                         DropdownMenuItem(
                           value: a.id,
@@ -825,8 +844,6 @@ class _TaskRecordState extends State<TaskRecord> {
                     onChanged: busy
                         ? null
                         : (v) => setState(() => applicationId = v),
-                    validator: (v) =>
-                        v == null ? 'Choose an application.' : null,
                   ),
                   const SizedBox(height: 20),
                   TextFormField(
@@ -1001,7 +1018,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
               const SizedBox(height: 12),
               Text(
                 active
-                    ? 'Runs every five minutes while Docker and n8n are running. Reads matching incoming career emails from the last seven days.'
+                    ? 'Checks messages every five minutes while Docker and n8n are running. See capture coverage for completed intervals and unfinished imports.'
                     : 'Open n8n to configure or publish workflows 06 and 07.',
               ),
               if (!healthy) ...[
@@ -1020,6 +1037,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
           ),
         ),
         const SizedBox(height: 24),
+        MailCaptureSettings(repository: widget.repository),
+        const SizedBox(height: 28),
+        NotificationSettings(repository: widget.repository),
+        const SizedBox(height: 28),
         Text('Label recovery', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
         const Text(

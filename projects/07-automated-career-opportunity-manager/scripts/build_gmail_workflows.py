@@ -1,7 +1,11 @@
 """Build portable Gmail intake and reconciliation workflows, inactive on import."""
 import json
+import argparse
 from pathlib import Path
-from urllib.parse import quote
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--only', choices=['05','06','07'], help='Regenerate one workflow without touching other exports')
+args = parser.parse_args()
 
 out = Path(__file__).resolve().parents[1] / 'workflows'
 service = {'httpHeaderAuth': {'id': 'project07EngineHeader', 'name': 'Project 07 local engine'}}
@@ -40,6 +44,8 @@ def edge(name):
     return {'node':name, 'type':'main', 'index':0}
 
 def save(key, title, nodes, filename, branches=None, scheduled=False):
+    if args.only and not filename.startswith(args.only+'-'):
+        return
     for i,n in enumerate(nodes):
         n['position']=[i*220,300]
     links = {a['name']:{'main':[[edge(b['name'])]]} for a,b in zip(nodes,nodes[1:])}
@@ -66,41 +72,69 @@ nodes=[manual(),http('Existing labels','https://gmail.googleapis.com/gmail/v1/us
             '={{ JSON.stringify({name:$json.name,labelListVisibility:"labelShow",messageListVisibility:"show"}) }}',True)]
 save('project07GmailLabels','Project 07 - 05 Prepare Gmail labels',nodes,'05-gmail-labels.json')
 
-query='newer_than:7d {subject:application subject:interview subject:internship subject:assessment subject:"thank you for applying" subject:shortlisted subject:"job offer" subject:"additional information"} -category:promotions -in:sent -in:drafts -from:jobalert.indeed.com -subject:"job alert" -subject:"jobs you may"'
-url='https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q='+quote(query)
-listing=http('Recent career messages',url,google=True)
-listing['parameters']['options']['pagination']={'pagination':{
-    'paginationMode':'updateAParameterInEachRequest',
-    'parameters':{'parameters':[{'type':'qs','name':'pageToken','value':'={{ $response.body.nextPageToken || "" }}'}]},
-    'paginationCompleteWhen':'other','completeExpression':'={{ !$response.body.nextPageToken }}',
-    'limitPagesFetched':True,'maxRequests':20,'requestInterval':750}}
 normalize=r"""const m=$json;let parts=[];
-function visit(p,type){if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}
+function visit(p,type){if(!p)return;if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}
 visit(m.payload,'text/plain');const plain=parts.join('\n');parts=[];visit(m.payload,'text/html');
-const html=parts.join('\n').replace(/<!--[\s\S]*?-->/g,' ').replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ');
+const rawHtml=parts.join('\n');
+const stripHtml=s=>s.replace(/<!--[\s\S]*?-->/g,' ').replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<(?:br\s*\/?|\/p|\/div)>/gi,'\n').replace(/<[^>]*>/g,' ');
+const html=stripHtml(rawHtml);
 const named={nbsp:' ',zwnj:'',zwj:'',amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",bull:' '};
-const htmlText=html.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(all,key)=>{if(key[0]==='#'){const n=parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';}return named[key.toLowerCase()]??all;}).replace(/\s+/g,' ').trim();
-const headers=m.payload.headers||[];const header=n=>headers.find(h=>h.name.toLowerCase()===n)?.value||'';
+const decode=s=>s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(all,key)=>{if(key[0]==='#'){const n=parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';}return named[key.toLowerCase()]??all;}).replace(/[^\S\n]+/g,' ').trim();
+const htmlText=decode(html);
+const currentHtml=decode(stripHtml(rawHtml.split(/<blockquote\b|<[^>]+class=["'][^"']*gmail_quote/i)[0]));
+const currentBody=(plain||currentHtml).split(/^\s*(?:On .+wrote:|From:|-----Original Message-----|>).*$/im)[0].trim();
+const headers=m.payload?.headers||[];const header=n=>headers.filter(h=>h.name.toLowerCase()===n).map(h=>h.value).join('\n');
+const run=$('Start mailbox page').first().json;
 return {json:{account:$('Gmail account').first().json.emailAddress,id:m.id,thread_id:m.threadId,
-received_at:new Date(Number(m.internalDate)).toISOString(),body:(plain||htmlText||'[No text body]').slice(0,45000),html_text:htmlText.slice(0,20000),
-subject:header('subject'),sender:header('from')}};"""
+received_at:new Date(Number(m.internalDate)).toISOString(),body:(plain||htmlText||'[No text body]').slice(0,45000),html_text:htmlText.slice(0,20000),current_body:currentBody.slice(0,45000),
+subject:header('subject'),sender:header('from'),headers,label_ids:m.labelIds||[],
+rfc_message_id:header('message-id'),references:header('references'),in_reply_to:header('in-reply-to'),
+reply_to:header('reply-to'),to:header('to'),cc:header('cc'),direction:(m.labelIds||[]).includes('SENT')?'sent':'received',
+mail_sync_run_id:run.run_id,mail_sync_lease_token:run.lease_token}};"""
+
+# One page per scheduled invocation: PostgreSQL owns the resume token, fixed
+# window and failure state. A provider error never advances the capture cursor.
 nodes=[manual(), http('Gmail account','https://gmail.googleapis.com/gmail/v1/users/me/profile',google=True),
  http('Record connection','http://crm:8780/internal/connection','={{ JSON.stringify({account:$json.emailAddress}) }}'),
- listing,
- code('Collect pages',"""const pages=$input.all();if(pages.at(-1).json.nextPageToken)throw new Error('Seven-day search exceeded 200 messages; narrow query before retry.');
-const ids=new Map();for(const p of pages)for(const m of p.json.messages||[])ids.set(m.id,m);
-return [{json:{account:$('Gmail account').first().json.emailAddress,messages:[...ids.values()]}}];"""),
+ http('Start mailbox page','http://crm:8780/api/workflows/mail/start',
+      '={{ JSON.stringify({account:$("Gmail account").first().json.emailAddress}) }}'),
+ condition('Lease acquired','={{ $json.should_run === true }}'),
+ http('Fetch mailbox page','={{ "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults="+$json.max_results+"&q="+encodeURIComponent($json.query)+($json.page_token?"&pageToken="+encodeURIComponent($json.page_token):"") }}',google=True,tolerate=True),
+ condition('Page fetched','={{ $json.statusCode === 200 && !!$json.body && !$json.body.error }}'),
+ code('Describe page',"""const run=$('Start mailbox page').first().json;const page=$json.body;
+const messages=page.messages||[];
+if(!Array.isArray(messages)||messages.length>run.max_results||messages.some(m=>!m.id))throw new Error('Invalid Gmail page');
+return [{json:{account:run.account,run_id:run.run_id,lease_token:run.lease_token,page_index:run.page_index,
+page_token:run.page_token,next_page_token:page.nextPageToken||null,message_ids:[...new Set(messages.map(m=>m.id))],messages}}];"""),
  http('Select unprocessed','http://crm:8780/internal/select-messages','={{ JSON.stringify($json) }}'),
  condition('Has messages','={{ $json.messages.length > 0 }}'),
  code('Message IDs','return $json.messages.map(m=>({json:m}));'),
- http('Read message','={{ "https://gmail.googleapis.com/gmail/v1/users/me/messages/"+encodeURIComponent($json.id)+"?format=full" }}',google=True),
+ http('Read message','={{ "https://gmail.googleapis.com/gmail/v1/users/me/messages/"+encodeURIComponent($json.id)+"?format=full" }}',google=True,tolerate=True),
+ code('Check message reads',"""const items=$input.all();const failed=items.find(i=>i.json.statusCode!==200||!i.json.body?.id||!i.json.body?.payload);
+if(failed)return [{json:{failed:true,error:[401,403].includes(failed.json.statusCode)?'authorization':'provider_error'}}];
+return items.map((item,index)=>({json:item.json.body,pairedItem:{item:index}}));"""),
+ condition('Messages readable','={{ $json.failed !== true }}'),
  code('Normalize email',normalize,True),
  code('Oldest first',"return $input.all().map((item,index)=>({json:item.json,pairedItem:{item:index}})).sort((a,b)=>a.json.received_at.localeCompare(b.json.received_at));"),
- http('Store in CRM','http://crm:8780/internal/gmail-ingest','={{ JSON.stringify($json) }}'),
- code('Count imported','return [{json:{processed:$input.all().length}}];'),
- http('Sync complete','http://crm:8780/internal/sync-complete','={{ JSON.stringify({processed:$json.processed||0}) }}')]
+ http('Store in CRM','http://crm:8780/internal/gmail-ingest','={{ JSON.stringify($json) }}',tolerate=True),
+ code('Check stored',"return [{json:{stored:$input.all().every(i=>i.json.statusCode===200&&!i.json.body?.error),error:'ingest_error'}}];"),
+ condition('Messages stored','={{ $json.stored === true }}'),
+ http('Acknowledge page','http://crm:8780/api/workflows/mail/page',
+      '={{ JSON.stringify($("Describe page").first().json) }}'),
+ http('Finish mailbox page','http://crm:8780/api/workflows/mail/finish',
+      '={{ JSON.stringify({...$("Start mailbox page").first().json,success:true}) }}'),
+ code('Read failure',"""const status=$json.statusCode||0;const run=$('Start mailbox page').first().json;
+const error=$json.error==='authorization'||[401,403].includes(status)?'authorization':
+status===400&&run.page_token?'invalid_page_token':$json.error==='ingest_error'?'ingest_error':'provider_error';
+return [{json:{account:run.account,run_id:run.run_id,lease_token:run.lease_token,success:false,error}}];"""),
+ http('Record mailbox failure','http://crm:8780/api/workflows/mail/finish','={{ JSON.stringify($json) }}')]
 save('project07GmailSync','Project 07 - 06 Gmail to persistent CRM',nodes,'06-gmail-crm-sync.json',
-     {'Has messages':{'main':[[edge('Message IDs')],[edge('Sync complete')]]}},True)
+     {'Lease acquired':{'main':[[edge('Fetch mailbox page')],[]]},
+      'Page fetched':{'main':[[edge('Describe page')],[edge('Read failure')]]},
+      'Has messages':{'main':[[edge('Message IDs')],[edge('Acknowledge page')]]},
+      'Messages readable':{'main':[[edge('Normalize email')],[edge('Read failure')]]},
+      'Messages stored':{'main':[[edge('Acknowledge page')],[edge('Read failure')]]},
+      'Finish mailbox page':{'main':[]},'Record mailbox failure':{'main':[]}},True)
 
 nodes=[manual(),http('Gmail account','https://gmail.googleapis.com/gmail/v1/users/me/profile',google=True),
  http('List Gmail labels','https://gmail.googleapis.com/gmail/v1/users/me/labels',google=True),
@@ -126,4 +160,4 @@ nodes.append(missing)
 save('project07GmailReconcile','Project 07 - 07 Verify and retry Gmail labels',nodes,'07-gmail-label-reconcile.json',
      {'Labels exist':{'main':[[edge('Apply Gmail labels')],[edge('Missing label result')]]},
       'Record delivery':{'main':[]},'Missing label result':{'main':[[edge('Record delivery')]]}},True)
-print('Prepared intake and reconciliation workflows; exports inactive until explicitly published.')
+print('Prepared '+(args.only or 'all Gmail')+' workflow export(s); inactive until explicitly published.')

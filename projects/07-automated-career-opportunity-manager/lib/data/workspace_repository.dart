@@ -11,6 +11,19 @@ abstract class WorkspaceRepository extends ApplicationRepository {
     'connection': <String, dynamic>{},
   };
   List<Map<String, dynamic>> get actionLog => [];
+  Map<String, dynamic> get todayData => {
+    'needs_response': tasks
+        .where((t) => t['status'] == 'open' && t['actor'] != 'employer')
+        .toList(),
+    'waiting': tasks
+        .where((t) => t['status'] == 'open' && t['actor'] == 'employer')
+        .toList(),
+    'upcoming': calendarData['items'] ?? [],
+    'review': reviewItems,
+    'handled': tasks.where((t) => t['status'] == 'done').toList(),
+    'notifications': [],
+    'coverage': <String, dynamic>{},
+  };
 
   Future<void> load({bool Function()? acceptResult});
   Future<void> resolveReview(Map<String, dynamic> body);

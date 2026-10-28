@@ -1,6 +1,8 @@
 # CareerFlow local hand-off — 1.1.0
 
-Updated October 26, 2026 for one user on a trusted Windows/WSL Docker device.
+Updated October 28, 2026 for one user on a trusted Windows/WSL Docker device.
+
+The follow-through update adds Today, evidence-linked requests, Windows desktop alerts, capture coverage, quick capture and private interview reminders. Read [the follow-through guide](docs/follow-through-guide.md) for daily use and the current verification boundary. The existing workspace password is unchanged.
 
 ## Open your workspace
 
@@ -37,7 +39,7 @@ Completing an action does not advance an application. There are no invented hiri
 
 Controlled progression and recovery pass. Five genuine application confirmations and scheduled Gmail label delivery were verified. Calendar reading and the local assistant's count query pass. No real test reply or invitation was sent; verify the first intentional send/booking in Google. A genuine subsequent employer email has not yet safely matched and advanced an application; that field-acceptance check remains open. Do not force a match to close it.
 
-The seven-day subject filter cannot discover every possible employer email. The app requires manual review for unfamiliar formats. Public hosting, multiple users, mobile packaging, attachment extraction, school Drive OAuth, document deletion/versioning and calibrated hiring predictions are outside this release. Drive links use their existing sharing permissions.
+Capture now scans received and Sent mail within its displayed time coverage, excluding drafts, spam and trash, rather than relying on a career-keyword subject filter. Conservative extraction still requires manual review for unfamiliar formats; applications without an email require quick capture. Public hosting, multiple users, mobile packaging, attachment extraction, school Drive OAuth, document deletion/versioning and calibrated hiring predictions are outside this release. Drive links use their existing sharing permissions.
 
 ## Transfer checklist
 

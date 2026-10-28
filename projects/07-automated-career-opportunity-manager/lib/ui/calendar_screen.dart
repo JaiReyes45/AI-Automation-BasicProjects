@@ -7,6 +7,8 @@ import 'action_editor.dart';
 import 'app_shell.dart';
 import 'app_theme.dart';
 import 'workspace_format.dart';
+import 'today_screen.dart';
+import 'application_workspace.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({
@@ -45,7 +47,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final all =
         (data['items'] as List? ?? [])
             .cast<Map>()
-            .where((e) => !['cancelled', 'not_in_window'].contains(e['status']))
+            .where(
+              (e) =>
+                  !['cancelled', 'not_in_window'].contains(e['status']) &&
+                  e['scheduling_state'] != 'cancelled' &&
+                  DateTime.tryParse(e['start']?.toString() ?? '') != null &&
+                  DateTime.tryParse(e['end']?.toString() ?? '') != null,
+            )
             .toList()
           ..sort((a, b) => a['start'].compareTo(b['start']));
     final visible = all
@@ -66,7 +74,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
-              'Make room for what’s next.',
+              'Interview calendar',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             FilledButton.icon(
@@ -91,7 +99,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               : 'Google Calendar is not connected yet. Complete the credential setup in n8n.',
         ),
         const Text(
-          'All times are shown in Manila. Confirmed guests receive a calendar invitation.',
+          'All times are shown in Manila. Tentative holds are private and do not confirm acceptance. Invitations require a reviewed action.',
         ),
         const SizedBox(height: 24),
         Container(
@@ -259,12 +267,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   if ((event['location'] ?? '').isNotEmpty)
                     Text(event['location']),
                   Text(
-                    'Calendar status: ${event['sync_state'] ?? 'synced'}',
+                    schedulingLabel(event),
                     style: const TextStyle(
                       color: teal,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  Text('Calendar sync: ${event['sync_state'] ?? 'unknown'}'),
+                  if (event['scheduling_state'] == 'tentative')
+                    const Text('Private hold · no guests invited'),
+                  if (widget.repository.applications.any(
+                    (a) => a.id == event['application_id'],
+                  ))
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ApplicationRecord(
+                            repository: widget.repository,
+                            applicationId: event['application_id'],
+                          ),
+                        ),
+                      ),
+                      child: const Text('Open application'),
+                    ),
                   if (event['error'] != null)
                     Text(
                       event['error'],

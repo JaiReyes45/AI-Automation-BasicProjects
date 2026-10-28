@@ -177,12 +177,95 @@
       ]
     },
     {
-      "id": "Create confirmed event",
-      "name": "Create confirmed event",
+      "id": "Read existing event",
+      "name": "Read existing event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "parameters": {
-        "url": "={{ \"https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=\"+($json.attendees.length?\"all\":\"none\") }}",
+        "url": "={{ \"https://www.googleapis.com/calendar/v3/calendars/primary/events/\"+encodeURIComponent($json.event_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 25000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "position": [
+        1610,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "rkf0GTF07ovWV6Ko",
+          "name": "CareerFlow Calendar"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Prepare calendar write",
+      "name": "Prepare calendar write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const p=$('Meeting jobs').item.json;const b=$json.body||{};const s=$json.statusCode||0;\nconst base={...p,should_write:false,ok:false,error:'Calendar could not safely prepare this event.'};\nif(p.status==='cancelled'&&(s===404||s===410))return {json:{...base,ok:true}};\nif(s!==200&&s!==404)return {json:base};\nif(s===200&&(b.extendedProperties?.private?.careerflow_event!==p.event_id||Number(b.extendedProperties?.private?.careerflow_revision||1)>Number(p.event_version||1)))return {json:{...base,error:'Calendar ownership or revision changed; review the event.'}};\nif(s===200&&p.private_hold&&(b.attendees||[]).length)return {json:{...base,error:'Guests were added to this reminder; automatic changes are paused.'}};\nif(s===200&&!b.etag)return {json:base};\nconst payload={summary:p.title,description:p.description||'',location:p.location||'',status:p.status||'confirmed',start:{dateTime:p.start,timeZone:'Asia/Manila'},end:{dateTime:p.end,timeZone:'Asia/Manila'},extendedProperties:{private:{...(b.extendedProperties?.private||{}),careerflow_event:p.event_id,careerflow_revision:String(p.event_version||1)}}};\nif(s===404)payload.id=p.event_id;\nif(!p.private_hold)payload.attendees=(p.attendees||[]).map(email=>({email}));\nreturn {json:{...base,should_write:true,method:s===404?'POST':'PATCH',etag:b.etag||'*',payload,send_updates:!p.private_hold&&(p.attendees||[]).length?'all':'none'}};",
+        "mode": "runOnceForEachItem"
+      },
+      "position": [
+        1840,
+        300
+      ]
+    },
+    {
+      "id": "Safe to write",
+      "name": "Safe to write",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "safe",
+              "leftValue": "={{ $json.should_write }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        2070,
+        300
+      ]
+    },
+    {
+      "id": "Write calendar event",
+      "name": "Write calendar event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "parameters": {
+        "url": "={{ \"https://www.googleapis.com/calendar/v3/calendars/primary/events\"+($json.method===\"PATCH\"?\"/\"+encodeURIComponent($json.event_id):\"\")+\"?sendUpdates=\"+$json.send_updates }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleCalendarOAuth2Api",
         "options": {
@@ -195,13 +278,16 @@
             }
           }
         },
-        "method": "POST",
+        "method": "={{ $json.method }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({id:$json.event_id,summary:$json.title,description:$json.description,location:$json.location,start:{dateTime:$json.start,timeZone:\"Asia/Manila\"},end:{dateTime:$json.end,timeZone:\"Asia/Manila\"},attendees:$json.attendees.map(email=>({email})),extendedProperties:{private:{careerflow_event:$json.event_id}}}) }}"
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify($json.method===\"PATCH\"?{\"If-Match\":$json.etag}:{}) }}"
       },
       "position": [
-        1610,
+        2300,
         300
       ],
       "credentials": {
@@ -236,7 +322,7 @@
         }
       },
       "position": [
-        1840,
+        2530,
         300
       ],
       "credentials": {
@@ -256,11 +342,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "parameters": {
-        "jsCode": "const p=$('Meeting jobs').item.json;const b=$json.body||{};const ok=$json.statusCode===200&&b.id===p.event_id&&b.extendedProperties?.private?.careerflow_event===p.event_id&&Date.parse(b.start?.dateTime)===Date.parse(p.start)&&Date.parse(b.end?.dateTime)===Date.parse(p.end);return {json:{id:p.id,lease:p.lease,ok,external_id:b.id,error:'Calendar readback did not confirm the event. Status '+($json.statusCode||0)}};",
+        "jsCode": "const p=$('Meeting jobs').item.json;const b=$json.body||{};const cancelled=p.status==='cancelled';const ok=$json.statusCode===200&&b.id===p.event_id&&b.extendedProperties?.private?.careerflow_event===p.event_id&&Number(b.extendedProperties?.private?.careerflow_revision||1)===Number(p.event_version||1)&&b.status===(p.status||'confirmed')&&(!p.private_hold||!(b.attendees||[]).length)&&(cancelled||(Date.parse(b.start?.dateTime)===Date.parse(p.start)&&Date.parse(b.end?.dateTime)===Date.parse(p.end)));return {json:{id:p.id,lease:p.lease,ok,external_id:b.id,error:'Calendar readback did not confirm the event. Status '+($json.statusCode||0)}};",
         "mode": "runOnceForEachItem"
       },
       "position": [
-        2070,
+        2760,
         300
       ]
     },
@@ -282,7 +368,7 @@
         "jsonBody": "={{ JSON.stringify($json) }}"
       },
       "position": [
-        2300,
+        2990,
         300
       ],
       "credentials": {
@@ -387,14 +473,54 @@
       "main": [
         [
           {
-            "node": "Create confirmed event",
+            "node": "Read existing event",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create confirmed event": {
+    "Read existing event": {
+      "main": [
+        [
+          {
+            "node": "Prepare calendar write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare calendar write": {
+      "main": [
+        [
+          {
+            "node": "Safe to write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safe to write": {
+      "main": [
+        [
+          {
+            "node": "Write calendar event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record meeting outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write calendar event": {
       "main": [
         [
           {

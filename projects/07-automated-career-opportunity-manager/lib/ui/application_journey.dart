@@ -89,7 +89,7 @@ class ApplicationJourney extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${applications.where((a) => a.stage == step.$1).length} applications',
+                              '${applications.where((a) => !a.isSavedOpportunity && a.stage == step.$1).length} applications',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: muted,

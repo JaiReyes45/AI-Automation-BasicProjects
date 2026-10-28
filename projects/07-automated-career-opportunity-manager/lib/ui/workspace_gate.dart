@@ -39,9 +39,11 @@ class _WorkspaceGateState extends State<WorkspaceGate> {
     } catch (e) {
       if (mounted) {
         setState(
-          () => error = login
-              ? 'Unable to sign in. Check the password and Docker services.'
-              : 'Sign in to open your saved applications.',
+          () => error = e.toString().contains('Incorrect workspace password')
+              ? 'Incorrect workspace password. Try again.'
+              : e.toString().contains('Sign in to the local workspace')
+              ? 'Sign in to open your saved applications.'
+              : 'CareerFlow could not connect or load your workspace. Check Docker, then use Retry connection. This does not mean your password changed.',
         );
       }
     } finally {

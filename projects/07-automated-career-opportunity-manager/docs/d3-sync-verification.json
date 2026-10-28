@@ -14,20 +14,35 @@
     "actions": {}
   },
   "intake": {
-    "checked_at": "2026-10-26T14:34:47.458370+00:00",
+    "checked_at": "2026-10-28T07:16:28.965788+00:00",
     "status": "success",
-    "last_node": "Sync complete",
+    "last_node": "Finish mailbox page",
     "counts": {
-      "Recent career messages": 2,
-      "Collect pages": 1,
-      "Message IDs": 0,
-      "Store in CRM": 0,
+      "Fetch mailbox page": 1,
+      "Message IDs": 15,
+      "Store in CRM": 15,
       "Label jobs": 0,
       "Record delivery": 0,
-      "Create label": 0
+      "Create label": 0,
+      "Meeting jobs": 0,
+      "Record meeting outcome": 0
     },
-    "actions": {},
-    "matched_messages": 16
+    "actions": {
+      "unrecognized_message": 8,
+      "opportunity_only": 7
+    },
+    "matched_messages": 30,
+    "capture": {
+      "complete": true,
+      "processed": 30,
+      "reason": "complete"
+    },
+    "coverage": {
+      "status": "healthy",
+      "complete_from": "2026-10-20T17:54:51.539224+00:00",
+      "complete_through": "2026-10-28T07:16:16.341964+00:00",
+      "last_error": null
+    }
   },
   "reconcile": {
     "checked_at": "2026-10-26T14:33:09.719253+00:00",
@@ -117,6 +132,89 @@
       },
       "matched_messages": 16,
       "workflow": "intake"
+    },
+    {
+      "checked_at": "2026-10-26T14:34:47.458370+00:00",
+      "status": "success",
+      "last_node": "Sync complete",
+      "counts": {
+        "Recent career messages": 2,
+        "Collect pages": 1,
+        "Message IDs": 0,
+        "Store in CRM": 0,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0
+      },
+      "actions": {},
+      "matched_messages": 16,
+      "workflow": "intake"
+    },
+    {
+      "checked_at": "2026-10-28T06:56:17.928127+00:00",
+      "status": "success",
+      "last_node": "Lease acquired",
+      "counts": {
+        "Fetch mailbox page": 0,
+        "Message IDs": 0,
+        "Store in CRM": 0,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0,
+        "Meeting jobs": 0,
+        "Record meeting outcome": 0
+      },
+      "actions": {},
+      "workflow": "intake"
+    },
+    {
+      "checked_at": "2026-10-28T06:57:59.605160+00:00",
+      "status": "success",
+      "last_node": "Finish mailbox page",
+      "counts": {
+        "Fetch mailbox page": 1,
+        "Message IDs": 11,
+        "Store in CRM": 11,
+        "Label jobs": 0,
+        "Record delivery": 0,
+        "Create label": 0,
+        "Meeting jobs": 0,
+        "Record meeting outcome": 0
+      },
+      "actions": {
+        "ignored": 5,
+        "unrecognized_message": 4,
+        "opportunity_only": 2
+      },
+      "matched_messages": 42,
+      "capture": {
+        "complete": true,
+        "processed": 42,
+        "reason": "complete"
+      },
+      "coverage": {
+        "status": "healthy",
+        "complete_from": "2026-10-20T17:54:51.539224+00:00",
+        "complete_through": "2026-10-28T06:57:49.306993+00:00",
+        "last_error": null
+      },
+      "workflow": "intake"
     }
-  ]
+  ],
+  "calendar": {
+    "checked_at": "2026-10-28T06:55:19.563370+00:00",
+    "status": "success",
+    "last_node": "Meeting jobs",
+    "counts": {
+      "Fetch mailbox page": 0,
+      "Message IDs": 0,
+      "Store in CRM": 0,
+      "Label jobs": 0,
+      "Record delivery": 0,
+      "Create label": 0,
+      "Meeting jobs": 0,
+      "Record meeting outcome": 0
+    },
+    "actions": {}
+  }
 }

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick capture · CareerFlow</title>
+<style>body{font:18px/1.6 system-ui,sans-serif;background:#faf9f5;color:#253b32;margin:8vh auto;padding:24px;max-width:650px}a{color:#24583e}#capture{display:inline-block;border:2px solid #24583e;border-bottom-width:5px;border-radius:16px;padding:12px 22px;background:#e8f2df;font-weight:700;text-decoration:none}p{max-width:60ch}h1{line-height:1.15}a:focus-visible{outline:3px solid #a76527;outline-offset:4px}</style>
+<main><a href="/">← CareerFlow</a><h1>Keep a job before you lose the tab.</h1>
+<p>Drag this button to your browser’s bookmarks bar. On a job page, select the description you want to keep, then click the bookmark.</p>
+<a id="capture">Save to CareerFlow</a>
+<p>CareerFlow opens a review form with the page title, link and selected text. Add the company and choose <strong>Saved opportunity</strong> or <strong>I applied</strong>. Nothing is stored until you save.</p>
+<p>The bookmark sends these fields only to your local CareerFlow app. Keep Docker running. Some sites block bookmark scripts; you can always use Quick capture in Today and paste the link.</p></main>
+<script>const origin=location.origin;document.getElementById('capture').href='javascript:'+encodeURIComponent("(()=>{const data={company:'',role:document.title.slice(0,300),source_url:location.href,job_description:String(window.getSelection()).slice(0,10000)};window.open("+JSON.stringify(origin+ '/#capture=')+"+encodeURIComponent(JSON.stringify(data)),'_blank','noopener');})()");</script>
+</html>

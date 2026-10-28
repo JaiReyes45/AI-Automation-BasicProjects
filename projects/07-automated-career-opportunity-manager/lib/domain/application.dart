@@ -32,6 +32,8 @@ class JobApplication {
     this.nextAction,
     this.submittedOn,
     this.jobDescription = '',
+    this.captureState = 'applied',
+    this.sourceUrl = '',
   }) : events = List.unmodifiable(events);
   final String id;
   final String company;
@@ -41,5 +43,8 @@ class JobApplication {
   final String? nextAction;
   final String? submittedOn;
   final String jobDescription;
+  final String captureState;
+  final String sourceUrl;
+  bool get isSavedOpportunity => captureState == 'saved';
   final List<ApplicationEvent> events;
 }

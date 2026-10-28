@@ -44,6 +44,7 @@ void main() {
       await tester.enterText(field('Company'), 'Northstar Labs');
       await tester.enterText(field('Role title'), 'Design Intern');
       await tester.enterText(field('Next action (optional)'), 'Send portfolio');
+      await tapText(tester, 'Applied');
       await tapText(tester, 'Save application');
       expect(repo.applications.length, 6);
       final id = repo.applications.first.id;

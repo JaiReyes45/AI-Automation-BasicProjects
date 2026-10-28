@@ -295,3 +295,29 @@ External sends and calendar invitations require explicit in-app confirmation of 
 - Final private backup passed checksums, isolated PostgreSQL restore and profile integrity. It contains five applications, 106 messages, 56 calendar events, nine workflows and three encrypted credentials; action/audit tables are empty after rollback-only tests.
 - Public release 1.1.0 packages source, the production web client, versioned fonts and the updated user/setup/verification guides. Private runtime data and screenshots remain excluded.
 - Sources retain the portfolio layout under projects/07-automated-career-opportunity-manager. GitHub publication accompanies this delivery; live reply/invitation and genuine employer follow-up checks retain the explicit acceptance boundary above.
+
+### October 28 — Follow-through sprint: implementation and integration milestone
+
+- Implemented resumable account-scoped Gmail capture with bounded pages, 24-hour overlap, optional historical reads and visible coverage. Historical reading does not extend the seven-day Gmail label-write window.
+- Implemented evidence-linked employer requests, unmatched actionable tasks, user/employer turn tracking, replay protection and preserved manual corrections.
+- Implemented durable Windows alert queue, pairing, delivery leases, retry/read/snooze and a local Windows helper. Helper installation and actual desktop display remain deployment checks.
+- Today, task details, notification settings, capture history, saved/applied quick capture, bookmark capture and calendar scheduling states are implemented in Flutter.
+- Assistant searches stored records before selecting evidence, reports coverage and sources, and answers operational counts/tasks without requiring Ollama. Explicit-date availability checks use the recently imported calendar.
+- Calendar transport supports private tentative/confirmed holds, reschedules and cancellation, with ownership, guest, revision and conditional-update guards.
+- Validation checkpoint: 30 Flutter tests passed; PostgreSQL synthetic acceptance passed with all changes rolled back and no provider calls. Python and workflow checks passed; final expanded regression and local deployment remain in progress.
+
+### October 28 — Local deployment and desktop delivery milestone
+
+- Deployed the new CRM and Flutter client; published only Gmail capture (06) and Calendar (09). Existing reply and label workers retain credentials and schedules.
+- Pre-deployment private backup passed checksums, isolated PostgreSQL restore and profile integrity: five applications, 107 messages and 56 calendar events preserved.
+- Live Gmail capture completed its first bounded window; live Calendar reading succeeded with an empty action queue. Windows helper paired, installed for sign-in startup, and acknowledged one clearly labeled desktop test. Test task completed; delivery evidence retained.
+- Fixed a Docker restart defect: nginx cached the former CRM address, causing HTTP 502 on login. Dynamic Docker DNS restores the route; the password was not changed. Login now distinguishes service failures from incorrect passwords.
+- Independent review identified and fixed new-thread request relevance, quoted HTML request replay, UTC/GMT offsets and calendar relinking. Expanded checks: 97 Python tests, 30 Flutter tests, clean analysis, MIME/calendar transport assertions and both rollback-only PostgreSQL suites pass. Focused re-review found no remaining important defects in those fixes.
+- Final web rebuild and signed-in browser acceptance continue. See `docs/follow-through-guide.md` for operation and limitations.
+
+### October 28 — Follow-through deployment verified
+
+- Final CRM/web images deployed healthy; Gmail workflow 06 imported, published and restarted. The login route responds normally after service recreation. Existing signed-in access survives a page reload; the workspace password was not changed.
+- Signed-in Today shows five evidence-linked response tasks. Connections confirms healthy capture through October 28 at 15:16 Manila, a connected Windows helper and acknowledged alert delivery. Unmatched requests remain visible for review.
+- Deployed PostgreSQL follow-through and organizer suites pass with rollback-only fixtures; no employer mail or guest invitation was sent. Python regression and exported MIME/calendar checks pass on the integrated source.
+- Daily-use and hand-off guides now describe current capture, manual matching, private calendar holds, notification delivery semantics and uptime requirements. Genuine employer progression and the first intentional external send remain field-acceptance checks, not claims made from synthetic tests.

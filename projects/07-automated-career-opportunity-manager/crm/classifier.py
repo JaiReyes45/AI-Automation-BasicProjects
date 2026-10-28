@@ -4,7 +4,7 @@ import hashlib
 from email.utils import parseaddr
 from workflow.engine import classify, current_text, decide
 
-PARSER_VERSION = 5
+PARSER_VERSION = 7
 ROLE_LABELS = ['IT Intern', 'QA Engineer Intern', 'Software Engineer Intern',
                'Business Application Intern', 'Data Engineer Intern', 'Other Internship']
 

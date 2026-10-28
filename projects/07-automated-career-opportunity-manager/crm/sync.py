@@ -20,14 +20,13 @@ def select_messages(db, body):
     account, messages = body['account'], body['messages']
     if not isinstance(messages, list) or len(messages) > 2000:
         raise ValueError('Message batch too large')
-    known = {i: r for i, r in db.execute('SELECT id,result FROM career.messages WHERE account=%s', (account,))}
+    known = {i: (r, e) for i, r, e in db.execute('SELECT id,result,envelope FROM career.messages WHERE account=%s', (account,))}
     selected = []
     for message in messages:
         key = message['id']
-        prior = known.get(key)
-        # Earlier broad-query jobs become eligible only after the focused query selects them.
-        db.execute('UPDATE career.label_jobs SET eligible=true WHERE account=%s AND message_id=%s', (account, key))
-        if not prior or (not prior.get('resolution') and not prior.get('application_id') and prior.get('parser_version', 1) < PARSER_VERSION):
+        prior, envelope = known.get(key, (None, {}))
+        # Read selection never grants permission to mutate historical Gmail labels.
+        if not prior or ('current_body' not in envelope and prior.get('action') != 'ignored') or (not prior.get('resolution') and not prior.get('application_id') and prior.get('parser_version', 1) < PARSER_VERSION):
             selected.append(message)
     return {'messages': selected, 'matched': len(messages)}
 

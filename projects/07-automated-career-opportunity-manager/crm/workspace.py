@@ -1,5 +1,7 @@
 """User-controlled review, tasks and recovery. Every mutation is auditable."""
 import uuid
+import re
+from email.utils import parseaddr
 from datetime import datetime, timezone, timedelta, date
 from psycopg.types.json import Jsonb
 from workflow.engine import current_text
@@ -32,8 +34,9 @@ def audit(db, kind, data):
 
 def reviews(db):
     rows = db.execute("""SELECT m.account,m.id,m.envelope,m.result,m.revision FROM career.messages m
-        JOIN career.label_jobs j ON j.account=m.account AND j.message_id=m.id
-        WHERE j.eligible AND (m.result->>'application_id' IS NULL OR m.result ? 'resolution')
+        LEFT JOIN career.label_jobs j ON j.account=m.account AND j.message_id=m.id
+        WHERE (j.eligible OR COALESCE((m.result->>'parser_version')::int,0)>=6)
+        AND m.result->>'action' NOT IN ('ignored','sent') AND (m.result->>'application_id' IS NULL OR m.result ? 'resolution')
         ORDER BY m.envelope->>'received_at' DESC""").fetchall()
     return {'items': [dict(account=a,id=i,revision=v,subject=m.get('subject','No subject'),
         sender=m.get('sender','Unknown sender'),received_at=m['received_at'],
@@ -44,8 +47,9 @@ def resolve(db, body):
     lock(db)
     account, message_id = text(body.get('account')), text(body.get('id'))
     row = db.execute("""SELECT m.envelope,m.result,m.revision FROM career.messages m
-        JOIN career.label_jobs j ON j.account=m.account AND j.message_id=m.id
-        WHERE m.account=%s AND m.id=%s AND j.eligible FOR UPDATE OF m""", (account,message_id)).fetchone()
+        LEFT JOIN career.label_jobs j ON j.account=m.account AND j.message_id=m.id
+        WHERE m.account=%s AND m.id=%s AND (j.eligible OR COALESCE((m.result->>'parser_version')::int,0)>=6)
+        AND m.result->>'action' NOT IN ('ignored','sent') FOR UPDATE OF m""", (account,message_id)).fetchone()
     if not row:
         raise ValueError('This message is not in the review queue.')
     message, result, revision = row
@@ -92,6 +96,9 @@ def resolve(db, body):
     if app:
         if message.get('thread_id') and message['thread_id'] not in app['threads']:
             app['threads'].append(message['thread_id'])
+        contact=parseaddr(message.get('sender',''))[1].casefold()
+        if contact and not re.search(r'no.?reply|indeed|jobstreet|linkedin|myworkday',contact):
+            app['verified_contacts']=list(dict.fromkeys(app.get('verified_contacts',[])+[contact]))
         db.execute('INSERT INTO career.applications VALUES (%s,%s,1) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=career.applications.version+1', (app['id'],Jsonb(app)))
         event = dict(description='Reviewed email: '+('created application' if action=='create' else 'linked to application')+(' · stage '+stage if stage else ''),
                      date=now(),source='review',message_id=message_id,email_date=message['received_at'],note=note,
@@ -105,6 +112,15 @@ def resolve(db, body):
     db.execute("""UPDATE career.label_jobs SET application_id=%s,labels=%s,state='pending',generation=generation+1,
         attempts=0,next_attempt=0,error=NULL WHERE account=%s AND message_id=%s""", (resolution['application_id'],Jsonb(labels),account,message_id))
     audit(db,'review',dict(account=account,message_id=message_id,**resolution))
+    from crm import engagement,interviews,notifications
+    if app:
+        engagement.relink(db,account,message_id,app['id'])
+        interviews.ingest(db,message,result)
+    else:
+        for key,data in db.execute("SELECT id,data FROM career.tasks WHERE data->>'source_account'=%s AND data->>'source_message_id'=%s",(account,message_id)):
+            data.update(status='done',dismissed=True,corrected=True,updated_at=now())
+            db.execute('UPDATE career.tasks SET data=%s,version=version+1 WHERE id=%s',(Jsonb(data),key))
+            notifications.suppress_task(db,key)
     return {'ok':True}
 
 
@@ -114,7 +130,8 @@ def tasks(db):
 
 def save_task(db, body):
     lock(db)
-    key, application_id = text(body.get('id')), text(body.get('application_id'))
+    key = text(body.get('id'))
+    application_id = text(body.get('application_id'), required=False) or None
     title = text(body.get('title'))
     category, status, due_on = body.get('category'), body.get('status'), body.get('due_on')
     if category not in CATEGORIES or status not in {'open','done'}:
@@ -122,16 +139,24 @@ def save_task(db, body):
     if due_on is not None:
         if not isinstance(due_on,str) or date.fromisoformat(due_on).isoformat()!=due_on:
             raise ValueError('Enter a date as YYYY-MM-DD, or leave it blank.')
-    if not db.execute('SELECT 1 FROM career.applications WHERE id=%s',(application_id,)).fetchone():
+    if application_id and not db.execute('SELECT 1 FROM career.applications WHERE id=%s',(application_id,)).fetchone():
         raise ValueError('Choose an application for this task.')
     old = db.execute('SELECT data,version FROM career.tasks WHERE id=%s',(key,)).fetchone()
     if (old[1] if old else 0) != body.get('version',0):
         raise LookupError('This task changed. Refresh before editing.')
-    data = dict(application_id=application_id,title=title,category=category,status=status,due_on=due_on,
+    if not application_id and not old:raise ValueError('Choose an application for a manual task.')
+    actor=body.get('actor',(old[0].get('actor','user') if old else 'user'))
+    if actor not in ('user','employer','unknown'):raise ValueError('Choose who acts next.')
+    data = dict(old[0] if old else {},application_id=application_id,title=title,category=category,status=status,due_on=due_on,actor=actor,corrected=True,
                 created_at=old[0]['created_at'] if old else now(),updated_at=now(),
                 completed_at=(old[0].get('completed_at') if old and old[0]['status']=='done' else now()) if status=='done' else None)
+    if old and old[0].get('due_on')!=due_on:data.update(due_at=None,deadline_origin='user' if due_on else None)
+    data['corrections']=(data.get('corrections',[])+[dict(at=now(),status=status,actor=actor,due_on=due_on)])[-30:]
     db.execute('INSERT INTO career.tasks VALUES (%s,%s,1) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=career.tasks.version+1',(key,Jsonb(data)))
     audit(db,'task',dict(task_id=key,application_id=application_id,status=status,title=title))
+    if status=='done':
+        from crm.notifications import suppress_task
+        suppress_task(db,key)
     if not old or old[0]['status'] != status:
         db.execute('INSERT INTO career.events(application_id,data) VALUES (%s,%s)',(application_id,Jsonb(dict(description=('Task completed: ' if status=='done' else 'Task reopened: ' if old else 'Task added: ')+title,date=now(),source='task'))))
     return {'ok':True}

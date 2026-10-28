@@ -21,6 +21,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
   };
   @override
   List<Map<String, dynamic>> actionLog = [];
+  @override
+  Map<String, dynamic> todayData = {};
 
   @override
   List<JobApplication> get applications => List.unmodifiable(_apps);
@@ -37,6 +39,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         nextAction: a['nextAction'],
         submittedOn: a['submitted_on'],
         jobDescription: a['job_description'] ?? '',
+        captureState: a['capture_state'] ?? 'applied',
+        sourceUrl: a['source_url'] ?? '',
         events: (a['events'] as List)
             .map(
               (e) =>
@@ -58,6 +62,7 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         'deliveries',
         'calendar',
         'actions',
+        'today',
       ])
         profileRequest('GET', '/api/crm/$path', ''),
     ]);
@@ -73,6 +78,7 @@ class PersistentApplicationRepository extends WorkspaceRepository {
     deliveries = items(results[4]);
     calendarData = Map<String, dynamic>.from(jsonDecode(results[5]));
     actionLog = items(results[6]);
+    todayData = Map<String, dynamic>.from(jsonDecode(results[7]));
   }
 
   @override
@@ -111,6 +117,9 @@ class PersistentApplicationRepository extends WorkspaceRepository {
     tasks = [];
     deliveries = [];
     connection = {};
+    todayData = {};
+    calendarData = {'items': <dynamic>[], 'connection': <String, dynamic>{}};
+    actionLog = [];
   }
 
   Future<void> login(String password) async {
@@ -136,6 +145,8 @@ class PersistentApplicationRepository extends WorkspaceRepository {
         'nextAction': a.nextAction,
         'submitted_on': a.submittedOn,
         'job_description': a.jobDescription,
+        'capture_state': a.captureState,
+        'source_url': a.sourceUrl,
         'version': versions[a.id] ?? 0,
       }),
     ),

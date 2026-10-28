@@ -79,8 +79,8 @@
       "waitBetweenTries": 1500
     },
     {
-      "id": "Recent career messages",
-      "name": "Recent career messages",
+      "id": "Start mailbox page",
+      "name": "Start mailbox page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -88,7 +88,69 @@
         300
       ],
       "parameters": {
-        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=newer_than%3A7d%20%7Bsubject%3Aapplication%20subject%3Ainterview%20subject%3Ainternship%20subject%3Aassessment%20subject%3A%22thank%20you%20for%20applying%22%20subject%3Ashortlisted%20subject%3A%22job%20offer%22%20subject%3A%22additional%20information%22%7D%20-category%3Apromotions%20-in%3Asent%20-in%3Adrafts%20-from%3Ajobalert.indeed.com%20-subject%3A%22job%20alert%22%20-subject%3A%22jobs%20you%20may%22",
+        "url": "http://crm:8780/api/workflows/mail/start",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({account:$(\"Gmail account\").first().json.emailAddress}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Lease acquired",
+      "name": "Lease acquired",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_run === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "Fetch mailbox page",
+      "name": "Fetch mailbox page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "url": "={{ \"https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=\"+$json.max_results+\"&q=\"+encodeURIComponent($json.query)+($json.page_token?\"&pageToken=\"+encodeURIComponent($json.page_token):\"\") }}",
         "options": {
           "timeout": 20000,
           "batching": {
@@ -97,23 +159,11 @@
               "batchInterval": 750
             }
           },
-          "pagination": {
-            "pagination": {
-              "paginationMode": "updateAParameterInEachRequest",
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "qs",
-                    "name": "pageToken",
-                    "value": "={{ $response.body.nextPageToken || \"\" }}"
-                  }
-                ]
-              },
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.nextPageToken }}",
-              "limitPagesFetched": true,
-              "maxRequests": 20,
-              "requestInterval": 750
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
             }
           }
         },
@@ -128,19 +178,51 @@
       },
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 1500
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
     },
     {
-      "id": "Collect pages",
-      "name": "Collect pages",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "Page fetched",
+      "name": "Page fetched",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        880,
+        1320,
         300
       ],
       "parameters": {
-        "jsCode": "const pages=$input.all();if(pages.at(-1).json.nextPageToken)throw new Error('Seven-day search exceeded 200 messages; narrow query before retry.');\nconst ids=new Map();for(const p of pages)for(const m of p.json.messages||[])ids.set(m.id,m);\nreturn [{json:{account:$('Gmail account').first().json.emailAddress,messages:[...ids.values()]}}];",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.statusCode === 200 && !!$json.body && !$json.body.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "Describe page",
+      "name": "Describe page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const run=$('Start mailbox page').first().json;const page=$json.body;\nconst messages=page.messages||[];\nif(!Array.isArray(messages)||messages.length>run.max_results||messages.some(m=>!m.id))throw new Error('Invalid Gmail page');\nreturn [{json:{account:run.account,run_id:run.run_id,lease_token:run.lease_token,page_index:run.page_index,\npage_token:run.page_token,next_page_token:page.nextPageToken||null,message_ids:[...new Set(messages.map(m=>m.id))],messages}}];",
         "mode": "runOnceForAllItems"
       }
     },
@@ -150,7 +232,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1760,
         300
       ],
       "parameters": {
@@ -181,7 +263,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1320,
+        1980,
         300
       ],
       "parameters": {
@@ -212,7 +294,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1540,
+        2200,
         300
       ],
       "parameters": {
@@ -226,7 +308,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1760,
+        2420,
         300
       ],
       "parameters": {
@@ -237,6 +319,13 @@
             "batch": {
               "batchSize": 1,
               "batchInterval": 750
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
             }
           }
         },
@@ -251,7 +340,53 @@
       },
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 1500
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "Check message reads",
+      "name": "Check message reads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const items=$input.all();const failed=items.find(i=>i.json.statusCode!==200||!i.json.body?.id||!i.json.body?.payload);\nif(failed)return [{json:{failed:true,error:[401,403].includes(failed.json.statusCode)?'authorization':'provider_error'}}];\nreturn items.map((item,index)=>({json:item.json.body,pairedItem:{item:index}}));",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Messages readable",
+      "name": "Messages readable",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.failed !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
     },
     {
       "id": "Normalize email",
@@ -259,11 +394,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1980,
+        3080,
         300
       ],
       "parameters": {
-        "jsCode": "const m=$json;let parts=[];\nfunction visit(p,type){if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}\nvisit(m.payload,'text/plain');const plain=parts.join('\\n');parts=[];visit(m.payload,'text/html');\nconst html=parts.join('\\n').replace(/<!--[\\s\\S]*?-->/g,' ').replace(/<(script|style)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi,' ').replace(/<[^>]*>/g,' ');\nconst named={nbsp:' ',zwnj:'',zwj:'',amp:'&',lt:'<',gt:'>',quot:'\"',apos:\"'\",bull:' '};\nconst htmlText=html.replace(/&(#x[0-9a-f]+|#\\d+|[a-z]+);/gi,(all,key)=>{if(key[0]==='#'){const n=parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';}return named[key.toLowerCase()]??all;}).replace(/\\s+/g,' ').trim();\nconst headers=m.payload.headers||[];const header=n=>headers.find(h=>h.name.toLowerCase()===n)?.value||'';\nreturn {json:{account:$('Gmail account').first().json.emailAddress,id:m.id,thread_id:m.threadId,\nreceived_at:new Date(Number(m.internalDate)).toISOString(),body:(plain||htmlText||'[No text body]').slice(0,45000),html_text:htmlText.slice(0,20000),\nsubject:header('subject'),sender:header('from')}};",
+        "jsCode": "const m=$json;let parts=[];\nfunction visit(p,type){if(!p)return;if(p.mimeType===type&&p.body?.data)parts.push(Buffer.from(p.body.data,'base64url').toString('utf8'));for(const child of p.parts||[])visit(child,type);}\nvisit(m.payload,'text/plain');const plain=parts.join('\\n');parts=[];visit(m.payload,'text/html');\nconst rawHtml=parts.join('\\n');\nconst stripHtml=s=>s.replace(/<!--[\\s\\S]*?-->/g,' ').replace(/<(script|style)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi,' ').replace(/<(?:br\\s*\\/?|\\/p|\\/div)>/gi,'\\n').replace(/<[^>]*>/g,' ');\nconst html=stripHtml(rawHtml);\nconst named={nbsp:' ',zwnj:'',zwj:'',amp:'&',lt:'<',gt:'>',quot:'\"',apos:\"'\",bull:' '};\nconst decode=s=>s.replace(/&(#x[0-9a-f]+|#\\d+|[a-z]+);/gi,(all,key)=>{if(key[0]==='#'){const n=parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';}return named[key.toLowerCase()]??all;}).replace(/[^\\S\\n]+/g,' ').trim();\nconst htmlText=decode(html);\nconst currentHtml=decode(stripHtml(rawHtml.split(/<blockquote\\b|<[^>]+class=[\"'][^\"']*gmail_quote/i)[0]));\nconst currentBody=(plain||currentHtml).split(/^\\s*(?:On .+wrote:|From:|-----Original Message-----|>).*$/im)[0].trim();\nconst headers=m.payload?.headers||[];const header=n=>headers.filter(h=>h.name.toLowerCase()===n).map(h=>h.value).join('\\n');\nconst run=$('Start mailbox page').first().json;\nreturn {json:{account:$('Gmail account').first().json.emailAddress,id:m.id,thread_id:m.threadId,\nreceived_at:new Date(Number(m.internalDate)).toISOString(),body:(plain||htmlText||'[No text body]').slice(0,45000),html_text:htmlText.slice(0,20000),current_body:currentBody.slice(0,45000),\nsubject:header('subject'),sender:header('from'),headers,label_ids:m.labelIds||[],\nrfc_message_id:header('message-id'),references:header('references'),in_reply_to:header('in-reply-to'),\nreply_to:header('reply-to'),to:header('to'),cc:header('cc'),direction:(m.labelIds||[]).includes('SENT')?'sent':'received',\nmail_sync_run_id:run.run_id,mail_sync_lease_token:run.lease_token}};",
         "mode": "runOnceForEachItem"
       }
     },
@@ -273,7 +408,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2200,
+        3300,
         300
       ],
       "parameters": {
@@ -287,13 +422,20 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2420,
+        3520,
         300
       ],
       "parameters": {
         "url": "http://crm:8780/internal/gmail-ingest",
         "options": {
-          "timeout": 20000
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
         },
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -310,33 +452,65 @@
       },
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 1500
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
     },
     {
-      "id": "Count imported",
-      "name": "Count imported",
+      "id": "Check stored",
+      "name": "Check stored",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2640,
+        3740,
         300
       ],
       "parameters": {
-        "jsCode": "return [{json:{processed:$input.all().length}}];",
+        "jsCode": "return [{json:{stored:$input.all().every(i=>i.json.statusCode===200&&!i.json.body?.error),error:'ingest_error'}}];",
         "mode": "runOnceForAllItems"
       }
     },
     {
-      "id": "Sync complete",
-      "name": "Sync complete",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "Messages stored",
+      "name": "Messages stored",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        2860,
+        3960,
         300
       ],
       "parameters": {
-        "url": "http://crm:8780/internal/sync-complete",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.stored === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "Acknowledge page",
+      "name": "Acknowledge page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4180,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/api/workflows/mail/page",
         "options": {
           "timeout": 20000
         },
@@ -345,7 +519,83 @@
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({processed:$json.processed||0}) }}"
+        "jsonBody": "={{ JSON.stringify($(\"Describe page\").first().json) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Finish mailbox page",
+      "name": "Finish mailbox page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4400,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/api/workflows/mail/finish",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({...$(\"Start mailbox page\").first().json,success:true}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "project07EngineHeader",
+          "name": "Project 07 local engine"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "id": "Read failure",
+      "name": "Read failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4620,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const status=$json.statusCode||0;const run=$('Start mailbox page').first().json;\nconst error=$json.error==='authorization'||[401,403].includes(status)?'authorization':\nstatus===400&&run.page_token?'invalid_page_token':$json.error==='ingest_error'?'ingest_error':'provider_error';\nreturn [{json:{account:run.account,run_id:run.run_id,lease_token:run.lease_token,success:false,error}}];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "Record mailbox failure",
+      "name": "Record mailbox failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4840,
+        300
+      ],
+      "parameters": {
+        "url": "http://crm:8780/api/workflows/mail/finish",
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
       },
       "credentials": {
         "httpHeaderAuth": {
@@ -405,25 +655,66 @@
       "main": [
         [
           {
-            "node": "Recent career messages",
+            "node": "Start mailbox page",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Recent career messages": {
+    "Start mailbox page": {
       "main": [
         [
           {
-            "node": "Collect pages",
+            "node": "Lease acquired",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Collect pages": {
+    "Lease acquired": {
+      "main": [
+        [
+          {
+            "node": "Fetch mailbox page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch mailbox page": {
+      "main": [
+        [
+          {
+            "node": "Page fetched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page fetched": {
+      "main": [
+        [
+          {
+            "node": "Describe page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe page": {
       "main": [
         [
           {
@@ -456,7 +747,7 @@
         ],
         [
           {
-            "node": "Sync complete",
+            "node": "Acknowledge page",
             "type": "main",
             "index": 0
           }
@@ -478,7 +769,36 @@
       "main": [
         [
           {
+            "node": "Check message reads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check message reads": {
+      "main": [
+        [
+          {
+            "node": "Messages readable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Messages readable": {
+      "main": [
+        [
+          {
             "node": "Normalize email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read failure",
             "type": "main",
             "index": 0
           }
@@ -511,23 +831,69 @@
       "main": [
         [
           {
-            "node": "Count imported",
+            "node": "Check stored",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Count imported": {
+    "Check stored": {
       "main": [
         [
           {
-            "node": "Sync complete",
+            "node": "Messages stored",
             "type": "main",
             "index": 0
           }
         ]
       ]
+    },
+    "Messages stored": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge page": {
+      "main": [
+        [
+          {
+            "node": "Finish mailbox page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish mailbox page": {
+      "main": []
+    },
+    "Read failure": {
+      "main": [
+        [
+          {
+            "node": "Record mailbox failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record mailbox failure": {
+      "main": []
     },
     "Every five minutes": {
       "main": [

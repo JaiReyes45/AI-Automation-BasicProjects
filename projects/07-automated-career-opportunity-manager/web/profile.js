@@ -1,5 +1,6 @@
 window.careerProfile = async function(method, path, body) {
  const r = await fetch(path, {method, headers: {'Content-Type':'application/json','X-CareerFlow':'local-profile'}, ...(body ? {body} : {})});
+ if(r.status>=500) throw new Error('CareerFlow service unavailable. Check Docker and retry.');
  const data = await r.json(); if (!r.ok) throw new Error(data.error || 'Storage unavailable'); return JSON.stringify(data);
 };
 window.careerUpload = function(category) {

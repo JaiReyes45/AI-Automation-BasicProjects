@@ -7,6 +7,9 @@ import 'app_theme.dart';
 import '../data/workspace_repository.dart';
 import 'email_panel.dart';
 import 'workspace_format.dart';
+import 'today_screen.dart';
+import '../data/profile_stub.dart'
+    if (dart.library.js_interop) '../data/profile_web.dart';
 
 class ApplicationWorkspace extends StatefulWidget {
   const ApplicationWorkspace({
@@ -73,7 +76,8 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                       .toLowerCase()
                       .contains(query) &&
                   (role == null || a.role == role) &&
-                  (stage == null || a.stage == stage) &&
+                  (stage == null ||
+                      (!a.isSavedOpportunity && a.stage == stage)) &&
                   (dates == null ||
                       (a.submittedOn != null &&
                           !DateTime.parse(a.submittedOn!)
@@ -277,7 +281,9 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                       children: [
                         Text(a.role),
                         Text(
-                          a.submittedOn == null
+                          a.isSavedOpportunity
+                              ? 'Saved opportunity · not submitted'
+                              : a.submittedOn == null
                               ? 'Submission date unknown'
                               : 'Submitted ${calendarDate(a.submittedOn!)}',
                           style: const TextStyle(
@@ -287,7 +293,13 @@ class _ApplicationWorkspaceState extends State<ApplicationWorkspace> {
                         ),
                         Text(a.source, style: const TextStyle(color: muted)),
                         const SizedBox(height: 10),
-                        BadgePill(a.stage.label, const Color(0xFFEAF3ED), teal),
+                        BadgePill(
+                          a.isSavedOpportunity
+                              ? 'Saved opportunity'
+                              : a.stage.label,
+                          const Color(0xFFEAF3ED),
+                          teal,
+                        ),
                         if (a.nextAction != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -313,9 +325,11 @@ class ApplicationRecord extends StatefulWidget {
     super.key,
     required this.repository,
     this.applicationId,
+    this.initialCapture,
   });
   final ApplicationRepository repository;
   final String? applicationId;
+  final Map<String, dynamic>? initialCapture;
   @override
   State<ApplicationRecord> createState() => _ApplicationRecordState();
 }
@@ -327,7 +341,9 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
       source,
       action,
       submitted,
+      sourceUrl,
       description;
+  late String captureState;
   late HiringStage stage;
   JobApplication? record;
   late bool editing;
@@ -340,18 +356,40 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
             (a) => a.id == widget.applicationId,
           );
     editing = record == null;
-    company = TextEditingController(text: record?.company);
-    role = TextEditingController(text: record?.role);
+    final capture = widget.initialCapture ?? {};
+    company = TextEditingController(
+      text: record?.company ?? capture['company']?.toString(),
+    );
+    role = TextEditingController(
+      text: record?.role ?? capture['role']?.toString(),
+    );
     source = TextEditingController(text: record?.source ?? 'Manual entry');
     action = TextEditingController(text: record?.nextAction);
     stage = record?.stage ?? HiringStage.submitted;
     submitted = TextEditingController(text: record?.submittedOn ?? '');
-    description = TextEditingController(text: record?.jobDescription ?? '');
+    description = TextEditingController(
+      text:
+          record?.jobDescription ??
+          capture['job_description']?.toString() ??
+          '',
+    );
+    sourceUrl = TextEditingController(
+      text: record?.sourceUrl ?? capture['source_url']?.toString() ?? '',
+    );
+    captureState = record?.captureState ?? 'saved';
   }
 
   @override
   void dispose() {
-    for (final c in [company, role, source, action, submitted, description]) {
+    for (final c in [
+      company,
+      role,
+      source,
+      action,
+      submitted,
+      description,
+      sourceUrl,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -365,6 +403,8 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
     stage = record!.stage;
     submitted.text = record!.submittedOn ?? '';
     description.text = record!.jobDescription;
+    sourceUrl.text = record!.sourceUrl;
+    captureState = record!.captureState;
     setState(() => editing = false);
   }
 
@@ -378,7 +418,12 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
     final changes = <ApplicationEvent>[];
     if (old == null) {
       changes.add(
-        ApplicationEvent('Manually added application · ${stage.label}', now),
+        ApplicationEvent(
+          captureState == 'saved'
+              ? 'Saved opportunity manually'
+              : 'User confirmed application · ${stage.label}',
+          now,
+        ),
       );
     } else {
       if (old.stage != stage) {
@@ -414,8 +459,12 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
       source: source.text.trim(),
       stage: stage,
       nextAction: next,
-      submittedOn: submitted.text.trim().isEmpty ? null : submitted.text.trim(),
+      submittedOn: captureState == 'saved' || submitted.text.trim().isEmpty
+          ? null
+          : submitted.text.trim(),
       jobDescription: description.text.trim(),
+      captureState: captureState,
+      sourceUrl: sourceUrl.text.trim(),
       events: [...changes, ...?old?.events],
     );
     setState(() => saving = true);
@@ -501,10 +550,63 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Capture status',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Saved opportunity'),
+                            selected: captureState == 'saved',
+                            onSelected: saving
+                                ? null
+                                : (_) => setState(() => captureState = 'saved'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Applied'),
+                            selected: captureState != 'saved',
+                            onSelected: saving
+                                ? null
+                                : (_) =>
+                                      setState(() => captureState = 'applied'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        captureState == 'saved'
+                            ? 'Saving a listing does not record a submission.'
+                            : 'Choose Applied only when you have submitted the application.',
+                      ),
+                      const SizedBox(height: 24),
                       field('Company', company),
                       field('Role title', role),
                       field('Source', source),
                       TextFormField(
+                        controller: sourceUrl,
+                        maxLength: 2000,
+                        decoration: const InputDecoration(
+                          labelText: 'Job listing URL (optional)',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return null;
+                          }
+                          final uri = Uri.tryParse(value.trim());
+                          return uri != null &&
+                                  ['http', 'https'].contains(uri.scheme) &&
+                                  uri.host.isNotEmpty
+                              ? null
+                              : 'Enter an http or https job listing URL.';
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        enabled: captureState != 'saved',
                         controller: submitted,
                         decoration: const InputDecoration(
                           labelText: 'Submission date (YYYY-MM-DD, optional)',
@@ -548,7 +650,9 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                               ),
                             )
                             .toList(),
-                        onChanged: (value) => setState(() => stage = value!),
+                        onChanged: captureState == 'saved'
+                            ? null
+                            : (value) => setState(() => stage = value!),
                       ),
                       const SizedBox(height: 20),
                       field(
@@ -593,7 +697,9 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                 const SizedBox(height: 8),
                 Text('Source: ${record!.source}'),
                 Text(
-                  record!.submittedOn == null
+                  record!.isSavedOpportunity
+                      ? 'Saved opportunity · not submitted'
+                      : record!.submittedOn == null
                       ? 'Submission date unknown'
                       : 'Submitted ${calendarDate(record!.submittedOn!)}',
                 ),
@@ -606,7 +712,19 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                   SelectableText(record!.jobDescription),
                 ],
                 const SizedBox(height: 20),
-                BadgePill(record!.stage.label, const Color(0xFFEAF3ED), teal),
+                BadgePill(
+                  record!.isSavedOpportunity
+                      ? 'Saved opportunity'
+                      : record!.stage.label,
+                  const Color(0xFFEAF3ED),
+                  teal,
+                ),
+                if (record!.sourceUrl.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => openDocument(record!.sourceUrl),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Open job listing'),
+                  ),
                 const SizedBox(height: 20),
                 OutlinedButton.icon(
                   onPressed: () => setState(() => editing = true),
@@ -622,6 +740,12 @@ class _ApplicationRecordState extends State<ApplicationRecord> {
                 Text(record!.nextAction ?? 'No next action set.'),
                 const SizedBox(height: 28),
                 if (widget.repository is WorkspaceRepository) ...[
+                  ApplicationFollowThrough(
+                    repository: widget.repository as WorkspaceRepository,
+                    applicationId: record!.id,
+                    onChanged: () => setState(() {}),
+                  ),
+                  const SizedBox(height: 28),
                   EmailPanel(
                     repository: widget.repository as WorkspaceRepository,
                     applicationId: record!.id,

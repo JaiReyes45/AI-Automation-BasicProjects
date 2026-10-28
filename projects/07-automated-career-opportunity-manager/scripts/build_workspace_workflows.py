@@ -14,7 +14,7 @@ CALENDAR = {'googleCalendarOAuth2Api': {'id': 'rkf0GTF07ovWV6Ko', 'name': 'Caree
 
 def node(name, kind, params, **kwargs):
     return dict(id=name, name=name, type='n8n-nodes-base.'+kind,
-                typeVersion={'manualTrigger':1,'scheduleTrigger':1.2,'httpRequest':4.2,'code':2}[kind],
+                typeVersion={'manualTrigger':1,'scheduleTrigger':1.2,'httpRequest':4.2,'code':2,'if':2.2}[kind],
                 parameters=params, position=[0,300], **kwargs)
 
 
@@ -74,10 +74,29 @@ nodes=[manual(),http('Primary calendar','https://www.googleapis.com/calendar/v3/
     http('Save calendar snapshot','http://crm:8780/internal/calendar/import','={{ JSON.stringify($json) }}'),
     http('Claim confirmed meetings','http://crm:8780/internal/actions/claim','={{ JSON.stringify({kind:"meeting"}) }}'),
     code('Meeting jobs','return ($json.jobs||[]).map(json=>({json}));'),
-    http('Create confirmed event','={{ "https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates="+($json.attendees.length?"all":"none") }}',
-         '={{ JSON.stringify({id:$json.event_id,summary:$json.title,description:$json.description,location:$json.location,start:{dateTime:$json.start,timeZone:"Asia/Manila"},end:{dateTime:$json.end,timeZone:"Asia/Manila"},attendees:$json.attendees.map(email=>({email})),extendedProperties:{private:{careerflow_event:$json.event_id}}}) }}',CALENDAR,True,True),
+    http('Read existing event','={{ "https://www.googleapis.com/calendar/v3/calendars/primary/events/"+encodeURIComponent($json.event_id) }}',credential=CALENDAR,tolerate=True),
+    code('Prepare calendar write',r"""const p=$('Meeting jobs').item.json;const b=$json.body||{};const s=$json.statusCode||0;
+const base={...p,should_write:false,ok:false,error:'Calendar could not safely prepare this event.'};
+if(p.status==='cancelled'&&(s===404||s===410))return {json:{...base,ok:true}};
+if(s!==200&&s!==404)return {json:base};
+if(s===200&&(b.extendedProperties?.private?.careerflow_event!==p.event_id||Number(b.extendedProperties?.private?.careerflow_revision||1)>Number(p.event_version||1)))return {json:{...base,error:'Calendar ownership or revision changed; review the event.'}};
+if(s===200&&p.private_hold&&(b.attendees||[]).length)return {json:{...base,error:'Guests were added to this reminder; automatic changes are paused.'}};
+if(s===200&&!b.etag)return {json:base};
+const payload={summary:p.title,description:p.description||'',location:p.location||'',status:p.status||'confirmed',start:{dateTime:p.start,timeZone:'Asia/Manila'},end:{dateTime:p.end,timeZone:'Asia/Manila'},extendedProperties:{private:{...(b.extendedProperties?.private||{}),careerflow_event:p.event_id,careerflow_revision:String(p.event_version||1)}}};
+if(s===404)payload.id=p.event_id;
+if(!p.private_hold)payload.attendees=(p.attendees||[]).map(email=>({email}));
+return {json:{...base,should_write:true,method:s===404?'POST':'PATCH',etag:b.etag||'*',payload,send_updates:!p.private_hold&&(p.attendees||[]).length?'all':'none'}};""",True),
+    node('Safe to write','if',{'conditions':{'options':{'caseSensitive':True,'leftValue':'','typeValidation':'strict','version':2},'conditions':[{'id':'safe','leftValue':'={{ $json.should_write }}','rightValue':True,'operator':{'type':'boolean','operation':'true','singleValue':True}}],'combinator':'and'},'options':{}}),
+    http('Write calendar event','={{ "https://www.googleapis.com/calendar/v3/calendars/primary/events"+($json.method==="PATCH"?"/"+encodeURIComponent($json.event_id):"")+"?sendUpdates="+$json.send_updates }}',
+         '={{ JSON.stringify($json.payload) }}',CALENDAR,True,True),
     http('Read back event','={{ "https://www.googleapis.com/calendar/v3/calendars/primary/events/"+encodeURIComponent($("Meeting jobs").item.json.event_id) }}',credential=CALENDAR,tolerate=True),
-    code('Meeting outcome',"const p=$('Meeting jobs').item.json;const b=$json.body||{};const ok=$json.statusCode===200&&b.id===p.event_id&&b.extendedProperties?.private?.careerflow_event===p.event_id&&Date.parse(b.start?.dateTime)===Date.parse(p.start)&&Date.parse(b.end?.dateTime)===Date.parse(p.end);return {json:{id:p.id,lease:p.lease,ok,external_id:b.id,error:'Calendar readback did not confirm the event. Status '+($json.statusCode||0)}};",True),
+    code('Meeting outcome',"const p=$('Meeting jobs').item.json;const b=$json.body||{};const cancelled=p.status==='cancelled';const ok=$json.statusCode===200&&b.id===p.event_id&&b.extendedProperties?.private?.careerflow_event===p.event_id&&Number(b.extendedProperties?.private?.careerflow_revision||1)===Number(p.event_version||1)&&b.status===(p.status||'confirmed')&&(!p.private_hold||!(b.attendees||[]).length)&&(cancelled||(Date.parse(b.start?.dateTime)===Date.parse(p.start)&&Date.parse(b.end?.dateTime)===Date.parse(p.end)));return {json:{id:p.id,lease:p.lease,ok,external_id:b.id,error:'Calendar readback did not confirm the event. Status '+($json.statusCode||0)}};",True),
     http('Record meeting outcome','http://crm:8780/internal/actions/result','={{ JSON.stringify($json) }}')]
 save('project07Calendar','Project 07 - 09 Calendar and confirmed meetings',nodes,'09-calendar-meetings.json',5)
+path=OUT/'09-calendar-meetings.json'
+workflow=json.loads(path.read_text())
+write=next(n for n in workflow['nodes'] if n['name']=='Write calendar event')
+write['parameters'].update(method='={{ $json.method }}',sendHeaders=True,specifyHeaders='json',jsonHeaders='={{ JSON.stringify($json.method==="PATCH"?{"If-Match":$json.etag}:{}) }}')
+workflow['connections']['Safe to write']['main'].append([{'node':'Record meeting outcome','type':'main','index':0}])
+path.write_text(json.dumps(workflow,indent=2)+'\n')
 print('Created inactive reviewed-action workflows with no execution data.')

@@ -13,6 +13,7 @@ import 'workspace_format.dart';
 import 'calendar_screen.dart';
 import 'assistant_screen.dart';
 import 'application_journey.dart';
+import 'today_screen.dart';
 import '../domain/application.dart';
 import '../data/profile_stub.dart'
     if (dart.library.js_interop) '../data/profile_web.dart';
@@ -113,6 +114,28 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     loadProfileHeader();
+    final fragment = Uri.base.fragment;
+    if (fragment.startsWith('capture=')) {
+      try {
+        final capture = Map<String, dynamic>.from(
+          jsonDecode(Uri.decodeComponent(fragment.substring(8))),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ApplicationRecord(
+                repository: widget.repository,
+                initialCapture: capture,
+              ),
+            ),
+          );
+          if (mounted) setState(() => selected = 1);
+        });
+      } catch (_) {
+        /* Invalid capture links never replace the workspace. */
+      }
+    }
     if (widget.repository is WorkspaceRepository) {
       refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         if (canAutoRefresh) refreshWorkspace();
@@ -154,7 +177,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   static const titles = [
-    'Overview',
+    'Today',
     'Applications',
     'Activity',
     'Connections',
@@ -248,7 +271,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: Text(
-                                  refreshError ?? 'Live view · refreshes every 30 seconds. Gmail checks every 5 minutes while Docker is running.',
+                                  refreshError ?? 'Workspace refreshes every 30 seconds. Capture coverage is shown below and in Connections.',
                                   style: TextStyle(
                                     color: refreshError == null
                                         ? muted
@@ -491,6 +514,15 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 ),
         ];
       default:
+        if (widget.repository is WorkspaceRepository) {
+          return [
+            TodayScreen(
+              repository: widget.repository as WorkspaceRepository,
+              onChanged: () => setState(() {}),
+              onNavigate: (index) => setState(() => selected = index),
+            ),
+          ];
+        }
         return [
           Container(
             width: double.infinity,
