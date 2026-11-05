@@ -2,10 +2,11 @@
 import json,pathlib,subprocess,sys,uuid
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 case=sys.argv[1] if len(sys.argv)>1 else 'command'
-assert case in ('command','estimate','model','memory','inventory','notebook','restaurant','transport','healthcare_admin')
+assert case in ('command','services','rates','estimate','model','memory','inventory','notebook','restaurant','transport','healthcare_admin')
 def run(args,**kw):return subprocess.run(args,text=True,capture_output=True,check=True,**kw)
 catalog=json.loads((ROOT/'.runtime/test-catalog.json').read_text())
 context={'update_id':900000001,'envelope':{'text':'/start','message_type':'text'},'state':{'requirements':{}},'catalog':catalog}
+if case in ('services','rates'):context['envelope']['text']='/'+case
 if case=='estimate':
     context['envelope']['text']='/confirm'
     context['state'].update(pending_estimate=True,requirements={'business_problem':'Copy email orders into a sheet','category':'workflow_automation','applications':['Gmail','Sheets'],'workflow_complexity':'basic','volume':20,'ai':False,'custom_api':False,'database':False,'handoff':False,'reporting':False,'timeline_days':14})
@@ -48,6 +49,8 @@ if case in ('restaurant','transport','healthcare_admin'):
         for original in calls:
             n=json.loads(json.dumps(original));n['id']=str(uuid.uuid4());n['name']+=f' Turn {turn}';nodes.append(n)
 checks={'command':"if(!$json.decision.response.includes('ChatterBox'))throw Error('start failed');",
+ 'services':"if(!$json.decision.response.includes('Approved services:')||$json.decision.handoff)throw Error('services failed');",
+ 'rates':"if(!$json.decision.response.includes('starting prices')||$json.decision.handoff)throw Error('rates failed');",
  'transport':"if($json.decision.handoff||!$json.state.requirements.expected_result||!$json.state.requirements.applications.includes('sheets')||['applications','manual_outcome','target_platform'].includes($json.state.pending_field))throw Error('transport progression failed');",
  'healthcare_admin':"if($json.decision.handoff||!$json.state.requirements.expected_result||!$json.state.requirements.applications.includes('sheets')||['applications','manual_outcome','target_platform'].includes($json.state.pending_field))throw Error('healthcare admin progression failed');",
  'restaurant':"const r=$json.state.requirements;if($json.decision.handoff||r.order_entry_mode!=='staff_entry'||!r.applications.includes('sheets')||!r.business_problem||['applications','order_entry_mode','target_platform'].includes($json.state.pending_field))throw Error('restaurant end-to-end failed');",
