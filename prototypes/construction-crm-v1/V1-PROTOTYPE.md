@@ -16,3 +16,5 @@ Privacy: credentials, personal contact details, provider-account identifiers, ru
 - [License](LICENSE) and [notices](docs/third-party-notices.md)
 
 The source runtime and tests are unchanged. Only public-documentation identifiers and installation-specific readiness records were sanitized for archival publication.
+
+The verified archival tag is construction-crm-v1-prototype-verified. V1-SNAPSHOT.json hashes refer to committed Git blob bytes so the canonical archive is reproducible across platforms. The initial prototype tag is retained as historical provenance; only the archival manifest and this note were corrected afterward. Runtime files are unchanged.
