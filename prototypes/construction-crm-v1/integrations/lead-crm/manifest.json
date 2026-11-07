@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "path": "workflows/00-orchestrator.json",
+      "sha256": "d21ed6b2cf54ccf9e28b59cbb9764ee9232fa8c0733facda3ff53f0cc751cb19",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/00-ai-lead-to-crm-orchestrator.json",
+        "sha256": "0a1b800ab9f25cb442dcdbc858472d61d16a7dc7d659276d172df475159e0522"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/01-intake.json",
+      "sha256": "ea135bf756f9d5459ed701be508d14a692bff29cf89d1d57b23b8e3f1068f392",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/01-intake-validation-persistence.json",
+        "sha256": "cba4affb264a3d1ac5b8db8ac08f4d40850cf41a9401dc45141b733bd3737692"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/02-extraction.json",
+      "sha256": "544b4af14af2ff032f7b24d6ab8c9452654b086f0bc39f673342a2d3fe5e708b",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/02-local-ai-extraction-validation.json",
+        "sha256": "81fe877694005ec5c1e457e75283f8c5225920f1742f68685f82bdd5a22954e1"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/03-scoring.json",
+      "sha256": "58b26c0a24b5b1b1105309812be750ad900a6c69b234ddc73018f0faf4460b65",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/03-deterministic-scoring-routing.json",
+        "sha256": "1618474ce54ce035d7665d4bfeb9ed4c6b3872b147670cef26577cb352ed5aeb"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/04-outbox-legacy.json",
+      "sha256": "695a0834ad880fdd41b098d3d629b74c8bab43661e06fcc07ca7b43b2fe358ae",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/04-notification-outbox-worker.json",
+        "sha256": "3d73d2c9891f9fabf1ffc6cb459d29c68709611dc2a880160524c996d848e474"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/05-replay-legacy.json",
+      "sha256": "c549f13a47b3e8149bc2e5f1c346ee2ef5ec62d2a490557399cc0711187c0a27",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/05-dead-letter-replay.json",
+        "sha256": "db213049c868eb17df8421a496b12b31d0b8fe2477b5f2c8e9942e0b9ee7c8a3"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/10-website-legacy.json",
+      "sha256": "60fae3193801913477d05f1df926fc63d21b67ae0b5f5690d8b1d658849c4b4b",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/10-webhook-lead-adapter.json",
+        "sha256": "a5f2d785e237560f76037281bad631195232213a0132658bded132f12ded9cf4"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/11-gmail-template.json",
+      "sha256": "06a3ae269b18b2ee4fde262626fcb493542efb9abd9ad00edc176d8609f00518",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/11-gmail-lead-adapter-template.json",
+        "sha256": "44cffad95b5ba2a6a9a03e0c82594d149ba5688aa674d94c81af086730fed513"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "workflows/20-hubspot-template.json",
+      "sha256": "93a15cd5a1c9078e31d43c8a398d9781a5bd14482e0cc9ad2d880aa303bbe51d",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/workflows/20-hubspot-crm-sync-template.json",
+        "sha256": "0d95b11f9bb0b1ce1880b42bd1c372d25f78843d601321d6fc3c471c9889efa4"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "database/001-core.sql",
+      "sha256": "79a1fda3809b740e99779b0f486b452c603e7c3825e51e8f7d4f21242b3d1106",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/database/001_core_crm_schema.sql",
+        "sha256": "79a1fda3809b740e99779b0f486b452c603e7c3825e51e8f7d4f21242b3d1106"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "database/002-scoring-outbox.sql",
+      "sha256": "f8706cddabd454de581b42de2e0bea24991d58687f0834c556b6f2eca56378ca",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/database/002_scoring_outbox_and_crm_sync.sql",
+        "sha256": "f8706cddabd454de581b42de2e0bea24991d58687f0834c556b6f2eca56378ca"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "database/tests/001_core_schema_smoke_test.sql",
+      "sha256": "063ea3d5c3dc753ce824a3ade3aa05eb197e46a698afd4dccf82ce66c698fc38",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/database/tests/001_core_schema_smoke_test.sql",
+        "sha256": "063ea3d5c3dc753ce824a3ade3aa05eb197e46a698afd4dccf82ce66c698fc38"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "database/tests/002_core_constraints_test.sql",
+      "sha256": "85acfc1bc52ff89de5d68ce2da949483c471e29ebe8413f9ddfc131494f3d6c4",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/database/tests/002_core_constraints_test.sql",
+        "sha256": "85acfc1bc52ff89de5d68ce2da949483c471e29ebe8413f9ddfc131494f3d6c4"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "database/tests/003_scoring_outbox_smoke_test.sql",
+      "sha256": "152a71eabb83f773b2adbd9c399357da257407a2583372a1c95ca5e4506bd021",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/database/tests/003_scoring_outbox_smoke_test.sql",
+        "sha256": "152a71eabb83f773b2adbd9c399357da257407a2583372a1c95ca5e4506bd021"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "fixtures/valid-lead.json",
+      "sha256": "eb453d0cd540a1af890eb6f52e695a79c11fed978a071fdbb7e7765522a6468f",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/fixtures/phase-3/valid-new-lead.json",
+        "sha256": "eb453d0cd540a1af890eb6f52e695a79c11fed978a071fdbb7e7765522a6468f"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "fixtures/duplicate-lead.json",
+      "sha256": "eb453d0cd540a1af890eb6f52e695a79c11fed978a071fdbb7e7765522a6468f",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/fixtures/phase-3/idempotent-repeat.json",
+        "sha256": "eb453d0cd540a1af890eb6f52e695a79c11fed978a071fdbb7e7765522a6468f"
+      },
+      "origin": "recovered"
+    },
+    {
+      "path": "fixtures/invalid-extraction.json",
+      "sha256": "fae5f3976fcd8863d15f43d18e3bf1c2500a5d837c44742b640297c4b3ee296c",
+      "source": {
+        "repository": "AI-Automation-BasicProjects",
+        "path": "projects/05-ai-lead-crm-automation/fixtures/phase-4/ai-extraction-schema.json",
+        "sha256": "dc88700926000974118e250b5b3a4eba5d2af686176db32ccf5d12f475af6572"
+      },
+      "origin": "derived"
+    }
+  ],
+  "workflowAliases": {
+    "00-orchestrator": "bbXRGYkgxNhEwshx",
+    "01-intake": "ZBXdwNy1N5WweeMT",
+    "02-extraction": "p05AiExtractV1",
+    "03-scoring": "p05ScoringRouteV1",
+    "04-outbox-legacy": "p05OutboxWorkerV1",
+    "05-replay-legacy": "p05ReplayV1",
+    "10-website-legacy": "5xMADgxrUq7E0suF",
+    "11-gmail-template": "p05GmailAdapterV1",
+    "20-hubspot-template": "p05HubSpotSyncV1"
+  }
+}

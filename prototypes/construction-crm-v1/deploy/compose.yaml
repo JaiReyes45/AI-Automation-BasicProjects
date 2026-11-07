@@ -1,0 +1,143 @@
+services:
+  edge:
+    image: caddy:2.10.2-alpine
+    ports: ["80:80", "443:443"]
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?domain required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge: {ipv4_address: 172.30.94.2}
+    restart: unless-stopped
+  db:
+    image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    environment:
+      POSTGRES_DB: construction_crm
+      POSTGRES_USER: construction_provisioner
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U construction_provisioner -d construction_crm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  gateway:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    environment:
+      DATABASE_URL_FILE: /run/secrets/gateway_database_url
+      OPERATIONS_ENCRYPTION_KEY_FILE: /run/secrets/operations_encryption_key
+      OWNER_BOOTSTRAP_HASH_FILE: /run/secrets/owner_bootstrap_hash
+      PUBLIC_ORIGIN: https://${PUBLIC_DOMAIN:?domain required}
+      SCHEDULING_URL: ${SCHEDULING_URL:?calendar link required}
+      RATE_MAX: ${RATE_MAX:-10}
+      RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
+      RECEIPT_RATE_MAX: ${RECEIPT_RATE_MAX:-60}
+      RECEIPT_RATE_WINDOW_MS: ${RECEIPT_RATE_WINDOW_MS:-60000}
+      TRUSTED_PROXIES: "172.30.94.2"
+      GHL_LOCATION_ID: ${GHL_LOCATION_ID:-}
+      GHL_CALENDAR_ID: ${GHL_CALENDAR_ID:-}
+    secrets: [gateway_database_url,operations_encryption_key,owner_bootstrap_hash]
+    networks:
+      edge: {ipv4_address: 172.30.94.3}
+      private: {}
+    depends_on: {db: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+  worker:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    command: [node, services/operations/src/worker-main.mjs]
+    environment:
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      OPERATIONS_ENCRYPTION_KEY_FILE: /run/secrets/operations_encryption_key
+      QUALIFICATION_WORKFLOW_URL: http://n8n:5678/webhook/construction-qualification
+      QUALIFICATION_WORKFLOW_TOKEN_FILE: /run/secrets/qualification_workflow_token
+    secrets: [worker_database_url,operations_encryption_key,qualification_workflow_token]
+    networks: [private,egress]
+    depends_on:
+      db: {condition: service_healthy}
+      n8n: {condition: service_healthy}
+      qualification: {condition: service_healthy}
+    restart: unless-stopped
+  qualification:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    command: [node, services/operations/src/qualification-server.mjs]
+    environment:
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      INTERNAL_ADAPTER_TOKEN_FILE: /run/secrets/internal_adapter_token
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-}
+      EXTRACTION_MAX_DAILY_CALLS: ${EXTRACTION_MAX_DAILY_CALLS:-100}
+    secrets: [worker_database_url,internal_adapter_token]
+    networks: [private,egress]
+    depends_on: {db: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  n8n:
+    image: n8nio/n8n@sha256:d91033b4fac2f7b75c5c4007e10824c66147f7d7a3cccb488720e97452ee7dc7
+    environment:
+      N8N_ENCRYPTION_KEY_FILE: /run/secrets/n8n_encryption_key
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+    secrets: [n8n_encryption_key]
+    volumes: ["n8n_data:/home/node/.n8n"]
+    networks: [private]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5678/healthz/readiness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 10
+    restart: unless-stopped
+  manage:
+    profiles: [manage]
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    command: [node, services/operations/src/manage.mjs, migrate]
+    environment:
+      PROVISIONER_DATABASE_URL_FILE: /run/secrets/provisioner_database_url
+      DATABASE_URL_FILE: /run/secrets/gateway_database_url
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      OPERATIONS_ENCRYPTION_KEY_FILE: /run/secrets/operations_encryption_key
+      OWNER_BOOTSTRAP_SECRET_FILE: /run/secrets/owner_bootstrap_secret
+      OWNER_BOOTSTRAP_HASH_FILE: /run/secrets/owner_bootstrap_hash
+    secrets: [provisioner_database_url,gateway_database_url,worker_database_url,operations_encryption_key,owner_bootstrap_secret,owner_bootstrap_hash,gateway_password,worker_password]
+    volumes:
+      - ${SECRETS_DIR:?secrets directory required}:/operator-secrets
+    networks: [private]
+    depends_on: {db: {condition: service_healthy}}
+networks:
+  edge:
+    ipam:
+      config: [{subnet: 172.30.94.0/24}]
+  private: {internal: true}
+  egress: {}
+volumes:
+  postgres_data: {}
+  n8n_data: {}
+  caddy_data: {}
+  caddy_config: {}
+secrets:
+  postgres_password: {file: "${SECRETS_DIR:?}/postgres_password"}
+  gateway_password: {file: "${SECRETS_DIR:?}/gateway_password"}
+  worker_password: {file: "${SECRETS_DIR:?}/worker_password"}
+  provisioner_database_url: {file: "${SECRETS_DIR:?}/provisioner_database_url"}
+  gateway_database_url: {file: "${SECRETS_DIR:?}/gateway_database_url"}
+  worker_database_url: {file: "${SECRETS_DIR:?}/worker_database_url"}
+  operations_encryption_key: {file: "${SECRETS_DIR:?}/operations_encryption_key"}
+  owner_bootstrap_secret: {file: "${SECRETS_DIR:?}/owner_bootstrap_secret"}
+  owner_bootstrap_hash: {file: "${SECRETS_DIR:?}/owner_bootstrap_hash"}
+  internal_adapter_token: {file: "${SECRETS_DIR:?}/internal_adapter_token"}
+  qualification_workflow_token: {file: "${SECRETS_DIR:?}/qualification_workflow_token"}
+  n8n_encryption_key: {file: "${SECRETS_DIR:?}/n8n_encryption_key"}

@@ -1,0 +1,4 @@
+{"runId":"demo","sourceId":"demo:1","sequence":1,"type":"run.started","status":"running"}
+{"runId":"demo","sourceId":"demo:2","sequence":2,"type":"tool.started","status":"running","payload":{"itemType":"commandExecution"}}
+{"runId":"demo","sourceId":"demo:3","sequence":3,"type":"tool.completed","status":"failed","payload":{"itemType":"commandExecution","exitCode":7}}
+{"runId":"demo","sourceId":"demo:4","sequence":4,"type":"run.completed","status":"completed"}

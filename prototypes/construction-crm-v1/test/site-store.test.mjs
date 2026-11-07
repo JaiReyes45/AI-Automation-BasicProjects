@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Store} from '../src/store.mjs';
+import {SiteStore} from '../src/site/store.mjs';
+import {tmpdir} from 'node:os';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+test('site migrations preserve old recorded runs across reopen and deduplicate events',t=>{const dir=mkdtempSync(join(tmpdir(),'site-db-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));let raw=new Store(join(dir,'data.db'));raw.append({runId:'old',sourceId:'old:1',sequence:1,type:'run.started'});let site=new SiteStore(raw.db);site.createProject({id:'p1',workspace:dir,label:'CRM'});const e={eventId:'e1',sourceEventId:'source1',source:'build-policy',projectId:'p1',mode:'build',sequence:1,type:'task.queued',status:'queued',evidence:'direct'};assert.equal(site.appendEvent(e).duplicate,false);assert.equal(site.appendEvent(e).duplicate,true);raw.close();raw=new Store(join(dir,'data.db'));site=new SiteStore(raw.db);assert.equal(raw.events('old').length,1);assert.equal(site.snapshot('p1').project.label,'CRM');assert.equal(site.eventsAfter(0).length,1);raw.close();});
+test('project and task identifiers reject reserved keys and missing workspaces',()=>{const raw=new Store(':memory:'),s=new SiteStore(raw.db);try{assert.throws(()=>s.createProject({id:'constructor',workspace:tmpdir()}));assert.throws(()=>s.createProject({id:'p',workspace:'relative'}));}finally{raw.close();}});
+test('reopening expires pending approvals and source sequence survives event removal',()=>{const raw=new Store(':memory:');try{let s=new SiteStore(raw.db);s.createProject({id:'p',workspace:tmpdir()});s.createTask({id:'t',projectId:'p'});const before=s.eventsAfter(0)[0].event.sequence;raw.db.prepare('INSERT INTO site_approvals VALUES(?,?)').run('approval',JSON.stringify({id:'approval',state:'pending'}));raw.db.exec('DELETE FROM site_events');s=new SiteStore(raw.db);assert.equal(s.read('site_approvals','approval').state,'expired');s.createTask({id:'t2',projectId:'p'});assert.ok(s.eventsAfter(0)[0].event.sequence>before);}finally{raw.close();}});

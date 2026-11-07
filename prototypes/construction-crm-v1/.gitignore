@@ -1,0 +1,9 @@
+.scratch/
+.data/
+node_modules/
+*.db*
+
+.private-operations/
+.env
+.env.*
+!.env.example

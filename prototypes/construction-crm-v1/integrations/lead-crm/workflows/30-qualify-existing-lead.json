@@ -1,0 +1,69 @@
+{
+  "id": "construction-qualify-existing-lead",
+  "name": "Construction CRM — qualify existing stored lead",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none"
+  },
+  "nodes": [
+    {
+      "id": "stored-lead-trigger",
+      "name": "Existing lead only",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "construction-qualification",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "construction-qualification",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "bounded-adapter",
+      "name": "Bounded recovered rules and durable commit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://qualification:8090/internal/qualification",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({submissionRecordId: $json.body.submissionRecordId, jobId: $json.body.jobId}) }}",
+        "options": {
+          "timeout": 45000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Existing lead only": {
+      "main": [
+        [
+          {
+            "node": "Bounded recovered rules and durable commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "implementation": "Delegates to an authenticated, transaction-owning adapter which executes original 02 validation and 03 deterministic scoring code. No second intake and no synthetic delivery nodes. Credentials must be bound by the operator before activation."
+  }
+}

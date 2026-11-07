@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    environment:
+      POSTGRES_DB: construction_test
+      POSTGRES_USER: construction_test
+      POSTGRES_PASSWORD: ${CONSTRUCTION_TEST_PASSWORD:?test password required}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U construction_test -d construction_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks: [test]
+  n8n:
+    image: n8nio/n8n@sha256:d91033b4fac2f7b75c5c4007e10824c66147f7d7a3cccb488720e97452ee7dc7
+    entrypoint: [/bin/sh, -c, "sleep infinity"]
+    environment:
+      N8N_ENCRYPTION_KEY: ${CONSTRUCTION_TEST_KEY:?test encryption key required}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_RUNNERS_MODE: internal
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+    tmpfs:
+      - /home/node/.n8n:uid=1000,gid=1000,mode=0700
+    volumes:
+      - ${CONSTRUCTION_TEST_ASSETS:?test assets required}:/test:ro
+    networks: [test]
+networks:
+  test:
+    internal: true

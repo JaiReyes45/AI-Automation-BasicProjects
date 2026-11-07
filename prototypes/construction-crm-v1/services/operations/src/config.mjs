@@ -1,0 +1,2 @@
+import {readFileSync} from 'node:fs';
+export function loadSecretFiles(env=process.env){for(const name of ['DATABASE_URL','WORKER_DATABASE_URL','PROVISIONER_DATABASE_URL','OPERATIONS_ENCRYPTION_KEY','OWNER_BOOTSTRAP_SECRET','OWNER_BOOTSTRAP_HASH','INTERNAL_ADAPTER_TOKEN','QUALIFICATION_WORKFLOW_TOKEN','OLLAMA_AUTHORIZATION'])if(!env[name]&&env[name+'_FILE'])env[name]=readFileSync(env[name+'_FILE'],'utf8').trim();return env;}

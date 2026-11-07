@@ -1,0 +1,13 @@
+{
+  "width": 100,
+  "height": 28,
+  "frameWidth": 20,
+  "frameHeight": 28,
+  "roles": [
+    "engineer",
+    "architect",
+    "foreman",
+    "builder",
+    "inspector"
+  ]
+}

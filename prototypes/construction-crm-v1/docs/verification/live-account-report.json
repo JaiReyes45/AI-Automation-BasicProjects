@@ -1,0 +1,77 @@
+{
+  "recordedAt": "2026-11-07T13:19:02.505002+00:00",
+  "hubspot": {
+    "sourceMode": "test-account",
+    "providerMode": "live",
+    "portalId": "REDACTED_PORTAL_ID",
+    "passed": true,
+    "records": [
+      {
+        "submissionId": "06d7dad2-d92d-4541-9a0f-f7c53031d3f1",
+        "contact": "REDACTED_HUBSPOT_CONTACT",
+        "company": "REDACTED_HUBSPOT_COMPANY",
+        "deal": "REDACTED_HUBSPOT_DEAL_1"
+      },
+      {
+        "submissionId": "ba43c883-e55f-4d71-991a-5dd827787720",
+        "contact": "REDACTED_HUBSPOT_CONTACT",
+        "company": "REDACTED_HUBSPOT_COMPANY",
+        "deal": "REDACTED_HUBSPOT_DEAL_2"
+      }
+    ],
+    "checks": [
+      {
+        "name": "partial-save recovery boundary",
+        "passed": true,
+        "note": "Real provider objects/association; one explicitly injected interruption"
+      },
+      {
+        "name": "same-submission replay reuses returned IDs",
+        "passed": true
+      },
+      {
+        "name": "returning contact/company reuse with enquiry-specific deals",
+        "passed": true
+      },
+      {
+        "name": "real unique correlation, unscheduled stage and associations read back",
+        "passed": true
+      }
+    ],
+    "dealCorrelationProperty": "construction_submission_id",
+    "pipelineId": "default",
+    "unscheduledStageId": "qualifiedtobuy",
+    "scheduledStageEnabled": false,
+    "recordsLabelled": true
+  },
+  "booking": {
+    "sourceMode": "test-account",
+    "providerMode": "live",
+    "observedAt": "2026-11-07T13:16:44.311Z",
+    "providerMeetingId": "REDACTED_TEST_APPOINTMENT",
+    "verifiedStates": [
+      "confirmed",
+      "rescheduled",
+      "cancelled"
+    ],
+    "finalCanonicalState": "cancelled",
+    "finalCanonicalVersion": 1794057254000,
+    "applicationEvidence": "Actual reader used at each live observation; captured responses then replayed through actual PostgreSQL store",
+    "checks": {
+      "matchedIdentity": true,
+      "staleCannotRewind": true,
+      "utcAndIanaStored": true,
+      "crmFailureIndependent": true
+    },
+    "publicForm": "Blocked by compulsory marketing checkbox; controlled appointment created in owner admin UI",
+    "productionWebhook": "Not subscribed or deployed"
+  },
+  "credentialSecurity": {
+    "storage": "Windows DPAPI outside the OneDrive checkout; no plaintext credential file",
+    "ghlRotationRequired": true,
+    "reason": "The GHL creation modal included its token in an accessible heading, which surfaced in a tool result. Rotate it through the account UI before production activation."
+  },
+  "productionActivated": false,
+  "privateIdentifiersRedacted": true,
+  "evidenceScope": "Historical V1 owner tests. Provider IDs are redacted, and each installation requires its own verification."
+}

@@ -1,0 +1,4 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {assertSystemEvidence} from '../scripts/pilot-construction-system.mjs';
+test('system evidence rejects a synthetic success that hides an unreceived lead or a lost independent state',()=>{const valid={sourceMode:'synthetic',leadCount:20,receipts:20,p95SceneMs:35,independentStates:true,localOfflineReceipts:true,replayMatches:true,duplicateReplayMatches:true,workerRecovered:true,cancellationBlocked:true,animationModelStarts:0};assert.equal(assertSystemEvidence(valid),true);assert.throws(()=>assertSystemEvidence({...valid,receipts:19}),/receipt/);assert.throws(()=>assertSystemEvidence({...valid,independentStates:false}),/independent/);assert.throws(()=>assertSystemEvidence({...valid,p95SceneMs:2001}),/latency/);assert.throws(()=>assertSystemEvidence({...valid,animationModelStarts:1}),/animation/);});

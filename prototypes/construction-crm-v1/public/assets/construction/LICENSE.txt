@@ -1,0 +1,3 @@
+Original Construction CRM pixel sprite atlas, authored for this repository.
+CC0 1.0 Universal: to the extent permitted by law, all copyright and related rights in this atlas are waived.
+https://creativecommons.org/publicdomain/zero/1.0/

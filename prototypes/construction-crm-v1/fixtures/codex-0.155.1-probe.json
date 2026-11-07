@@ -1,0 +1,378 @@
+[
+  {
+    "check": "initialize",
+    "status": "passed"
+  },
+  {
+    "method": "remoteControl/status/changed"
+  },
+  {
+    "check": "thread/start",
+    "status": "passed"
+  },
+  {
+    "method": "thread/started"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "thread/settings/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "thread/status/changed"
+  },
+  {
+    "method": "turn/started",
+    "status": "inProgress"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "mcpServer/startupStatus/updated"
+  },
+  {
+    "method": "item/started",
+    "itemType": "userMessage"
+  },
+  {
+    "method": "item/completed",
+    "itemType": "userMessage"
+  },
+  {
+    "method": "item/started",
+    "itemType": "agentMessage"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/completed",
+    "itemType": "agentMessage"
+  },
+  {
+    "method": "turn/moderationMetadata"
+  },
+  {
+    "method": "item/started",
+    "itemType": "commandExecution",
+    "exitCode": null
+  },
+  {
+    "method": "item/commandExecution/outputDelta"
+  },
+  {
+    "method": "item/commandExecution/outputDelta"
+  },
+  {
+    "method": "item/commandExecution/outputDelta"
+  },
+  {
+    "method": "item/commandExecution/outputDelta"
+  },
+  {
+    "method": "item/completed",
+    "itemType": "commandExecution",
+    "exitCode": 0
+  },
+  {
+    "method": "thread/tokenUsage/updated"
+  },
+  {
+    "method": "account/rateLimits/updated"
+  },
+  {
+    "method": "turn/moderationMetadata"
+  },
+  {
+    "method": "item/started",
+    "itemType": "commandExecution",
+    "exitCode": null
+  },
+  {
+    "method": "item/completed",
+    "itemType": "commandExecution",
+    "exitCode": 0
+  },
+  {
+    "method": "item/started",
+    "itemType": "commandExecution",
+    "exitCode": null
+  },
+  {
+    "method": "item/completed",
+    "itemType": "commandExecution",
+    "exitCode": 7
+  },
+  {
+    "method": "thread/tokenUsage/updated"
+  },
+  {
+    "method": "account/rateLimits/updated"
+  },
+  {
+    "method": "item/started",
+    "itemType": "agentMessage"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "item/agentMessage/delta"
+  },
+  {
+    "method": "turn/moderationMetadata"
+  },
+  {
+    "method": "item/completed",
+    "itemType": "agentMessage"
+  },
+  {
+    "method": "thread/tokenUsage/updated"
+  },
+  {
+    "method": "account/rateLimits/updated"
+  },
+  {
+    "method": "thread/status/changed"
+  },
+  {
+    "method": "turn/completed",
+    "status": "completed"
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "requirement": "local-tests",
+    "sourceMode": "synthetic",
+    "status": "passed",
+    "artifactRef": "docs/verification/clean-install.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "system-pilot",
+    "sourceMode": "synthetic",
+    "status": "passed",
+    "artifactRef": "docs/verification/system-pilot.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "clean-install",
+    "sourceMode": "synthetic",
+    "status": "passed",
+    "artifactRef": "docs/verification/clean-install.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "private-n8n-bridge",
+    "sourceMode": "synthetic",
+    "status": "passed",
+    "artifactRef": "docs/verification/private-n8n-bridge.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "build-runtime",
+    "sourceMode": "real-runtime",
+    "status": "passed",
+    "runtimeObserved": true,
+    "artifactRef": "docs/build-pilot.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "qualification-provider",
+    "sourceMode": "real-runtime",
+    "status": "pending",
+    "runtimeObserved": false,
+    "providerMode": "unconfigured",
+    "artifactRef": "docs/qualification-adapter.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "hubspot-account",
+    "sourceMode": "test-account",
+    "status": "pending",
+    "providerMode": "unconfigured",
+    "externalIds": {},
+    "artifactRef": "docs/verification/live-account-report.json",
+    "recordedAt": "2026-11-07T13:19:02.505002+00:00",
+    "pendingReason": "Public V1 archive: historical owner tests do not configure or verify a new installation."
+  },
+  {
+    "requirement": "booking-account",
+    "sourceMode": "test-account",
+    "status": "pending",
+    "providerMode": "unconfigured",
+    "externalIds": {},
+    "verifiedStates": [],
+    "artifactRef": "docs/verification/live-account-report.json",
+    "recordedAt": "2026-11-07T13:19:02.505002+00:00",
+    "pendingReason": "Public V1 archive: historical owner tests do not configure or verify a new installation."
+  },
+  {
+    "requirement": "accessibility-owner",
+    "sourceMode": "human",
+    "status": "pending",
+    "observer": "owner",
+    "ownerAccepted": false,
+    "artifactRef": "docs/qa/public-and-demo.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  },
+  {
+    "requirement": "owner-release",
+    "sourceMode": "human",
+    "status": "pending",
+    "observer": "owner",
+    "ownerAccepted": false,
+    "artifactRef": "docs/verification/release-readiness.md",
+    "recordedAt": "2026-11-07T11:47:09.662521+00:00"
+  }
+]

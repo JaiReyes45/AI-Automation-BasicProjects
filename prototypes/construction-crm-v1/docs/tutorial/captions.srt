@@ -1,0 +1,88 @@
+1
+00:00:00,550 --> 00:00:07,213
+Construction CRM turns project work into a small construction site, with you as the engineer.
+
+2
+00:00:07,433 --> 00:00:13,167
+You commission work, watch its evidence, and decide when a milestone is complete.
+
+3
+00:00:14,687 --> 00:00:22,545
+The demo page plays recorded sample events. Switch between Build and Operate, or drag the replay slider.
+
+4
+00:00:22,765 --> 00:00:27,334
+This preview starts no coding tasks and makes no AI calls.
+
+5
+00:00:28,854 --> 00:00:33,863
+To use the working app, open PowerShell in the extracted source folder.
+
+6
+00:00:34,083 --> 00:00:41,901
+Run npm run doctor, then npm start. Keep this terminal open and open its dashboard address.
+
+7
+00:00:43,421 --> 00:00:47,744
+Click Connect and paste the local owner token printed in that terminal.
+
+8
+00:00:47,964 --> 00:00:54,128
+This is your dashboard token. Keep HubSpot and GHL credentials on the server.
+
+9
+00:00:55,648 --> 00:01:00,486
+Give the project a name and enter the absolute folder path containing its code.
+
+10
+00:01:00,706 --> 00:01:07,600
+For your first experiment, set Maximum model task starts to one, then register the project.
+
+11
+00:01:09,120 --> 00:01:16,058
+Enter a clear task, such as improving empty email validation while keeping valid submissions working.
+
+12
+00:01:16,278 --> 00:01:23,941
+Choose a crew role, an available model, installed skills, and a milestone. Then commission and start.
+
+13
+00:01:25,461 --> 00:01:32,285
+The work order moves through running and verification. Select Inspect to examine the task evidence.
+
+14
+00:01:32,505 --> 00:01:39,198
+One model task runs by default. The worker animation itself uses no AI calls.
+
+15
+00:01:40,718 --> 00:01:46,731
+If a permission request appears, read the exact command or file change before deciding.
+
+16
+00:01:46,951 --> 00:01:54,000
+Approve only that action, or decline. An approval does not grant permission for the whole session.
+
+17
+00:01:55,520 --> 00:02:03,023
+Review the changed files and any configured checks. Passing checks and your acceptance complete the milestone.
+
+18
+00:02:03,243 --> 00:02:08,901
+In the work orders table, choose Accept work only when the result meets your criteria.
+
+19
+00:02:10,421 --> 00:02:18,474
+After the hosted backend is configured, Operate shows enquiries, HubSpot delivery, consultations, and reviews.
+
+20
+00:02:18,694 --> 00:02:26,687
+A consultation can be confirmed while CRM delivery is retrying. Customers use your hosted enquiry page.
+
+21
+00:02:28,207 --> 00:02:34,586
+Start locally, register a project, and commission one small, reviewable task.
+
+22
+00:02:34,806 --> 00:02:45,324
+Hosted deployment, the always on model, GHL key rotation, and owner acceptance remain pending. The installation guide explains setup.
+

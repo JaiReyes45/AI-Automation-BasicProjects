@@ -1,0 +1,8 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {validateSiteEvent,toPublicSummary} from '../contracts/site-event.mjs';
+const event=(extra={})=>({eventId:'e1',sourceEventId:'s1',source:'build-runtime',projectId:'p1',mode:'build',sequence:1,type:'tool.started',status:'running',evidence:'direct',actorId:'a1',taskId:'t1',...extra});
+test('site events strip private content and produce fixed public summaries',()=>{const e=validateSiteEvent(event({message:'person@example.test token=private',publicSummary:'<script>private</script>',authorization:'Bearer private'}));assert.doesNotMatch(JSON.stringify(e),/private|person@|script|authorization/);assert.equal(e.publicSummary,'Tool started');assert.equal(toPublicSummary(e),'Tool started');});
+test('site events reject unknown sources, cross-mode commands and unsafe usage',()=>{for(const patch of [{source:'other'},{source:'operations',mode:'operate'},{sequence:-1},{sequence:Number.MAX_SAFE_INTEGER+1},{usage:{inputTokens:-1,measured:true}},{usage:{outputTokens:1.2,measured:true}}])assert.throws(()=>validateSiteEvent(event(patch)));});
+test('valid operations events cannot impersonate build instructions',()=>{assert.equal(validateSiteEvent(event({source:'operations',mode:'operate',type:'appointment.confirmed',status:'confirmed'})).type,'appointment.confirmed');assert.throws(()=>validateSiteEvent(event({source:'operations',mode:'operate',type:'task.started'})));});
+test('scene identity fields reject object prototype keys',()=>{for(const actorId of ['__proto__','constructor','toString'])assert.throws(()=>validateSiteEvent(event({actorId})));});

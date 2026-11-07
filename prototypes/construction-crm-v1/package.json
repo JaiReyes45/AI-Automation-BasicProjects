@@ -1,0 +1,25 @@
+{
+  "name": "agent-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "test": "node --experimental-sqlite --test test/*.test.mjs",
+    "start": "node --experimental-sqlite src/cli.mjs serve",
+    "import": "node --experimental-sqlite src/cli.mjs import",
+    "probe": "node scripts/probe.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "package": "node scripts/package.mjs",
+    "pilot": "node --experimental-sqlite scripts/pilot.mjs",
+    "test:crm-baseline": "node scripts/test-crm-baseline.mjs",
+    "pilot:build": "node --experimental-sqlite scripts/pilot-construction-build.mjs",
+    "test:operations-db": "node scripts/test-operations-db.mjs",
+    "pilot:system": "node --experimental-sqlite scripts/test-operations-db.mjs --system-pilot",
+    "demo:site": "node scripts/demo-server.mjs",
+    "verify:release": "node --experimental-sqlite scripts/verify-construction-release.mjs",
+    "test:qualification-bridge": "node scripts/test-private-bridge.mjs"
+  }
+}

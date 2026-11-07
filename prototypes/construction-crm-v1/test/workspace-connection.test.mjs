@@ -1,0 +1,4 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {loadWorkspaceContext} from '../public/site/connection.mjs';
+test('saved project loading succeeds when the runtime catalog fails or stalls',async()=>{let modelsResolve;const projects=[{id:'saved',label:'Existing project'}],seen=[];const first=await loadWorkspaceContext({readProjects:async()=>projects,readModels:()=>Promise.reject(new Error('runtime offline')),onProjects:async p=>seen.push(p[0].id),onModels:()=>{},onModelError:e=>seen.push(e.message)});await first.modelRequest;assert.equal(first.projects,projects);assert.ok(seen.includes('saved'));assert.ok(seen.includes('runtime offline'));let shown=false;const second=await loadWorkspaceContext({readProjects:async()=>projects,readModels:()=>new Promise(r=>modelsResolve=r),onProjects:()=>{shown=true;},onModels:()=>{},onModelError:()=>{}});assert.equal(shown,true);modelsResolve([]);await second.modelRequest;});

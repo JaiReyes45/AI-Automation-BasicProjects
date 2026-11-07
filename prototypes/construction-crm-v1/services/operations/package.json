@@ -1,0 +1,25 @@
+{
+  "name": "construction-crm-operations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "start": "node src/server.mjs",
+    "worker": "node src/worker-main.mjs",
+    "qualification": "node src/qualification-server.mjs",
+    "migrate": "node src/manage.mjs migrate",
+    "provision": "node src/manage.mjs provision",
+    "bootstrap": "node src/manage.mjs bootstrap",
+    "configure": "node src/manage.mjs configure",
+    "setup": "node src/manage.mjs setup",
+    "recover-owner": "node src/manage.mjs recover-owner",
+    "test:db": "node ../../scripts/test-operations-db.mjs"
+  },
+  "dependencies": {
+    "pg": "8.23.1"
+  }
+}

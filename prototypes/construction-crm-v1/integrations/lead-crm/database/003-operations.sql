@@ -1,0 +1,15 @@
+BEGIN;
+CREATE TABLE lead_crm.owner_bootstrap(singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),claimed_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.owner_tokens(id UUID PRIMARY KEY,token_hash TEXT UNIQUE NOT NULL,expires_at TIMESTAMPTZ NOT NULL,revoked_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.lead_receipts(token_hash TEXT PRIMARY KEY,submission_id UUID NOT NULL REFERENCES lead_crm.lead_submissions(id),expires_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE lead_crm.integration_connections(provider TEXT PRIMARY KEY,encrypted_credentials JSONB NOT NULL,config JSONB NOT NULL DEFAULT '{}',state TEXT NOT NULL DEFAULT 'UNVERIFIED',updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.appointments(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),provider TEXT NOT NULL,provider_meeting_id TEXT NOT NULL,provider_version BIGINT NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'unverified' CHECK(status IN('unverified','confirmed','cancelled','rescheduled')),submission_id UUID REFERENCES lead_crm.lead_submissions(id),contact_external_id TEXT,start_utc TIMESTAMPTZ,end_utc TIMESTAMPTZ,time_zone TEXT,linkage TEXT NOT NULL DEFAULT 'unmatched' CHECK(linkage IN('matched','unmatched','ambiguous')),verified BOOLEAN NOT NULL DEFAULT FALSE,updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),UNIQUE(provider,provider_meeting_id));
+CREATE TABLE lead_crm.event_inbox(provider TEXT NOT NULL,provider_event_id TEXT NOT NULL,payload_hash TEXT NOT NULL,data JSONB NOT NULL,received_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(provider,provider_event_id));
+CREATE TABLE lead_crm.scene_events(cursor BIGSERIAL PRIMARY KEY,event_id TEXT UNIQUE NOT NULL,source_event_id TEXT UNIQUE NOT NULL,event JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.scene_checkpoints(id TEXT PRIMARY KEY,cursor BIGINT NOT NULL,scene JSONB NOT NULL);
+CREATE TABLE lead_crm.policy_decisions(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),submission_id UUID REFERENCES lead_crm.lead_submissions(id),kind TEXT NOT NULL,data JSONB NOT NULL DEFAULT '{}',created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.extraction_cache(cache_key TEXT PRIMARY KEY,facts JSONB NOT NULL,schema_version TEXT NOT NULL,model_version TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE lead_crm.qualification_claims(submission_id UUID PRIMARY KEY REFERENCES lead_crm.lead_submissions(id),claim_token UUID NOT NULL,expires_at TIMESTAMPTZ NOT NULL,state TEXT NOT NULL DEFAULT 'PROCESSING',attempt_count INT NOT NULL DEFAULT 0 CHECK(attempt_count BETWEEN 0 AND 2));
+CREATE SEQUENCE lead_crm.scene_source_sequence;
+INSERT INTO lead_crm.schema_migrations(version,description) VALUES('003','Operations evidence and private owner');
+COMMIT;

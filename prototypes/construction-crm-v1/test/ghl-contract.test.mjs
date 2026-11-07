@@ -1,0 +1,4 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createGhlReader} from '../services/operations/src/bookings.mjs';
+test('GHL reader accepts the observed appointment envelope and still rejects foreign sources',async()=>{const appointment={id:'controlled-meeting',locationId:'location',calendarId:'calendar',contactId:'contact',appointmentStatus:'confirmed',dateUpdated:'2026-11-07T13:00:00.000Z',startTime:'2026-11-09T08:30:00Z',endTime:'2026-11-09T09:00:00Z'},read=createGhlReader({token:'synthetic-only',locationId:'location',calendarId:'calendar',fetchImpl:async()=>({ok:true,json:async()=>({appointment})})});assert.equal((await read('controlled-meeting')).status,'confirmed');appointment.locationId='foreign';await assert.rejects(read('controlled-meeting'),/source mismatch/);});
